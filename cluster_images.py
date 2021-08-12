@@ -1,11 +1,14 @@
 import argparse
 import glob
+import json
 import os
+from enum import Enum
 
 import cv2
 import numpy as np
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg16 import preprocess_input
+from scipy.spatial.distance import cdist
 from sklearn import preprocessing  # to normalise
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -15,6 +18,25 @@ Cluster images using CNN feature maps and PCA.
 """
 
 IMAGE_SIZE = 320
+
+
+class Mode(Enum):
+    CLUSTER = 'cluster'
+    CLASSIFY = 'classify'
+
+    def __str__(self):
+        return self.value
+
+    def __repr__(self):
+        return str(self)
+
+    @staticmethod
+    def argparse(s):
+        try:
+            return Mode[s.upper()]
+        except KeyError:
+            return s
+
 
 def glob_files(folder, file_type='*'):
     search_string = os.path.join(folder, file_type)
@@ -129,6 +151,9 @@ def cluster_images(folder, file_type="*"):
     # keep the cluster centers
     print(kmeans.cluster_centers_)
     print(cluster_idx)
+    centroids_filename = 'centroids.json'
+    to_json(centroids_filename, kmeans.cluster_centers_.tolist())
+    print('centroid values are saved as {}'.format(centroids_filename))
 
     for key, idx in cluster_idx.items():
         print("Cluster {}".format(key))
@@ -136,10 +161,54 @@ def cluster_images(folder, file_type="*"):
         for id in idx:
             print("\t{}".format(filenames[id]))
 
+def to_json(path, data):
+    """
+    save json data to path
+    """
+    with open(path, 'w', encoding='utf-8') as file:
+        json.dump(data, file, ensure_ascii=False, indent=4)
+
+def from_json(path):
+    """
+    save json data to path
+    """
+    file = open(path, 'r', encoding='utf-8')
+    return json.load(file)
+
+def classify(folder, centroids_file, file_type='*', threshold=0.7):
+    centroids = from_json(centroids_file)
+    X_fm, filenames = to_feature_maps(folder, file_type=file_type)
+    print("####", X_fm.shape)
+
+    # normalize to use cosine similarity
+    X_fm = preprocessing.normalize(X_fm.reshape(len(X_fm), -1))
+
+    # use cosine to calculate similarities
+    dist = cdist(X_fm, centroids, metric='cosine')
+    print(dist)
+
+    for id, d, filename in zip(range(len(filenames)), dist, filenames):
+        cluster_id = np.argmin(d)
+        dist_min = np.min(d)
+
+        print("{}: {} is {}".format(id, os.path.basename(filename), cluster_id))
+        if dist_min > threshold:
+            print("\t{} might not belong to any cluster. {}".format(os.path.basename(filename), d))
+            print("\tTime to create a new cluster")
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument("-mode", action="store", type=Mode.argparse, choices=list(Mode), dest="mode")
     parser.add_argument("-path", action="store", dest="path", type=str)
+    parser.add_argument("-centroids_json", action="store", dest="centroids_json", type=str)
     parser.add_argument("-threshold", action="store", dest="threshold", type=int, default=80)
 
     args = parser.parse_args()
-    cluster_images(args.path)
+
+    if args.mode == Mode.CLUSTER:
+        cluster_images(args.path)
+    elif args.mode == Mode.CLASSIFY:
+        classify(args.path, args.centroids_json)
+    else:
+        raise ValueError("Specify either -cluster or -classify option")
