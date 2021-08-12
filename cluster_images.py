@@ -6,12 +6,12 @@ import cv2
 import numpy as np
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg16 import preprocess_input
-from scipy.spatial.distance import cdist
-from sklearn import preprocessing  # to normalise existing X
+from sklearn import preprocessing  # to normalise
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
 """
+Cluster images using CNN feature maps and PCA.
 """
 
 IMAGE_SIZE = 320
@@ -36,7 +36,7 @@ def glob_files(folder, file_type='*'):
     return paths
 
 
-def get_feature_maps(path, file_type="*.png"):
+def to_feature_maps(path, file_type="*.png"):
     def _to_feature_maps(X):
         #Convert to VGG input format
         X = preprocess_input(X)
@@ -51,30 +51,43 @@ def get_feature_maps(path, file_type="*.png"):
 
     files = glob_files(path, file_type)
 
+    files_processed = []
     feature_maps = []
     for file in files:
         print(file)
         image = cv2.imread(file)
-        image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
-        fm = _to_feature_maps(np.array([image]))
-        feature_maps.append(fm)
+        if image is not None:
+            image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
+            # doing it one at a time to reduce the memory foot print
+            fm = _to_feature_maps(np.array([image]))
+            feature_maps.append(fm)
+            files_processed.append(file)
+        else:
+            print(file, ' is not an image file')
 
-    return np.array(feature_maps)
-
-
-def get_pca_reduced(X_features, dimensions=2):
-  X_features_flatten = X_features.reshape(X_features.shape[0], -1)
-  print("Flattened shape: ", X_features_flatten.shape)
-  pca = PCA(dimensions)
-
-  X_features_pca_reduced = pca.fit_transform(X_features_flatten)
-
-  return X_features_pca_reduced, pca
+    return np.array(feature_maps), files_processed
 
 
-def get_clusters(X_reduced, K):
+def to_pca_reduced(x_features, dimensions=2):
+    """
+    reduces dimensions of the input.
+    This is mainly for plotting purposes.
+    :param x_features: feature maps
+    :param dimensions: target number of dimensions
+    :return: reduced features
+    """
+    X_features_flatten = x_features.reshape(x_features.shape[0], -1)
+    print("Flattened shape: ", X_features_flatten.shape)
+    pca = PCA(dimensions)
+
+    X_features_pca_reduced = pca.fit_transform(X_features_flatten)
+
+    return X_features_pca_reduced, pca
+
+
+def to_clusters(x_reduced, K):
   kmeans = KMeans(n_clusters=K, random_state=0)
-  X_clusters = kmeans.fit(X_reduced)
+  X_clusters = kmeans.fit(x_reduced)
 
   return X_clusters, kmeans
 
@@ -89,28 +102,39 @@ def to_cluster_idx(cluster_labels, bins):
         cluster_dict[cluster_id] = np.where(cluster_labels == cluster_id)[0]
     return cluster_dict
 
-def cluster_images(folder, file_type="*.png"):
-    X_fm = get_feature_maps(folder, file_type=file_type)
+def cluster_images(folder, file_type="*"):
+    X_fm, filenames = to_feature_maps(folder, file_type=file_type)
     print("####", X_fm.shape)
 
-    # normalize
+    # normalize to use cosine similarity
     X_fm_normalized = preprocessing.normalize(X_fm.reshape(len(X_fm), -1))
 
     print(X_fm_normalized.shape)
-    # # dimensionality reduction through PCA
-    X_reduced, pca = get_pca_reduced(X_fm_normalized, dimensions=2)
 
-    # # cluster
-    X_clusters, kmeans = get_clusters(X_reduced, 2)
-    # X_clusters, kmeans = get_clusters(X_fm_normalized, 2)
+    # number of clusters
+    K = 2
+
+    # # Dimensionality reduction through PCA.
+    # # This is optional.
+    # # We are using it mainly for plotting purposes.
+    # X_reduced, pca = to_pca_reduced(X_fm_normalized, dimensions=K)
+
+    # cluster using feature maps or PCA reduced features
+    # X_clusters, kmeans = to_clusters(X_reduced, K)
+    X_clusters, kmeans = to_clusters(X_fm_normalized, K)
 
     # get the image ids of each cluster
-    cluster_idx = to_cluster_idx(X_clusters.labels_, [0, 1])
+    cluster_idx = to_cluster_idx(X_clusters.labels_, range(K))
 
     # keep the cluster centers
     print(kmeans.cluster_centers_)
     print(cluster_idx)
 
+    for key, idx in cluster_idx.items():
+        print("Cluster {}".format(key))
+
+        for id in idx:
+            print("\t{}".format(filenames[id]))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
