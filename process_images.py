@@ -12,6 +12,7 @@ from scipy.spatial.distance import cdist
 from sklearn import preprocessing  # to normalise
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from PIL import Image
 
 """
 Cluster images using CNN feature maps and PCA.
@@ -23,6 +24,7 @@ IMAGE_SIZE = 320
 class Mode(Enum):
     CLUSTER = 'cluster'
     CLASSIFY = 'classify'
+    RESIZE = 'resize'
 
     def __str__(self):
         return self.value
@@ -81,8 +83,9 @@ def to_feature_maps(path, file_type="*.png"):
         if image is not None:
             image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
             # doing it one at a time to reduce the memory foot print
-            fm = _to_feature_maps(np.array([image]))
-            feature_maps.append(fm)
+            # fm = _to_feature_maps(np.array([image]))
+            # feature_maps.append(fm)
+            feature_maps.append(image)
             files_processed.append(file)
         else:
             print(file, ' is not an image file')
@@ -161,6 +164,17 @@ def cluster_images(folder, file_type="*"):
         for id in idx:
             print("\t{}".format(filenames[id]))
 
+def resize(path, file_type='*'):
+    files = glob_files(path, file_type)
+
+    for file in files:
+        image = Image.open(file)
+        # I downsize the image with an ANTIALIAS filter (gives the highest quality)
+        if image.size[0] > 1000:
+            image = image.resize((int(image.size[0]/5), int(image.size[1]/5)))
+        print(image.size[0], image.size[1])
+        image.save(path + "resized\\" + os.path.basename(file))
+
 def to_json(path, data):
     """
     save json data to path
@@ -210,5 +224,7 @@ if __name__ == '__main__':
         cluster_images(args.path)
     elif args.mode == Mode.CLASSIFY:
         classify(args.path, args.centroids_json)
+    elif args.mode == Mode.RESIZE:
+        resize(args.path)
     else:
         raise ValueError("Specify either -cluster or -classify option")
