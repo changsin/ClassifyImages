@@ -13,6 +13,8 @@ from sklearn import preprocessing  # to normalise
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from PIL import Image
+import pathlib
+from shutil import copyfile
 
 """
 Cluster images using CNN feature maps and PCA.
@@ -25,6 +27,7 @@ class Mode(Enum):
     CLUSTER = 'cluster'
     CLASSIFY = 'classify'
     RESIZE = 'resize'
+    DEDUPE = 'dedupe'
 
     def __str__(self):
         return self.value
@@ -83,9 +86,9 @@ def to_feature_maps(path, file_type="*.png"):
         if image is not None:
             image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE))
             # doing it one at a time to reduce the memory foot print
-            # fm = _to_feature_maps(np.array([image]))
-            # feature_maps.append(fm)
-            feature_maps.append(image)
+            image = image / 255
+            fm = _to_feature_maps(np.array([image]))
+            feature_maps.append(fm)
             files_processed.append(file)
         else:
             print(file, ' is not an image file')
@@ -164,17 +167,6 @@ def cluster_images(folder, file_type="*"):
         for id in idx:
             print("\t{}".format(filenames[id]))
 
-def resize(path, file_type='*'):
-    files = glob_files(path, file_type)
-
-    for file in files:
-        image = Image.open(file)
-        # I downsize the image with an ANTIALIAS filter (gives the highest quality)
-        if image.size[0] > 1000:
-            image = image.resize((int(image.size[0]/5), int(image.size[1]/5)))
-        print(image.size[0], image.size[1])
-        image.save(path + "resized\\" + os.path.basename(file))
-
 def to_json(path, data):
     """
     save json data to path
@@ -210,13 +202,75 @@ def classify(folder, centroids_file, file_type='*', threshold=0.7):
             print("\t{} might not belong to any cluster. {}".format(os.path.basename(filename), d))
             print("\tTime to create a new cluster")
 
+def resize(path_in, file_type='*'):
+    files = glob_files(path_in, file_type)
+
+    path_out = os.path.join(path_in, 'resized')
+    # create the folder if it doesn't exist
+    pathlib.Path(path_out).mkdir(parents=True, exist_ok=True)
+
+    for file in files:
+        image = Image.open(file)
+        # I downsize the image with an ANTIALIAS filter (gives the highest quality)
+        if image.size[0] > 1000:
+            image = image.resize((int(image.size[0]/5), int(image.size[1]/5)))
+        print(image.size[0], image.size[1])
+
+        filename_out = os.path.join(path_out, os.path.basename(file))
+        image.save(filename_out)
+
+def find_duplicates(X_train_pca, threshold=0.1):
+    # Calculate distances of all points
+    distances = cdist(X_train_pca, X_train_pca)
+
+    # Find duplicates (very similar images)
+    # dupes = np.array([np.where(distances[id] < 1) for id in range(distances.shape[0])]).reshape(-1)
+    dupes = [np.array(np.where(distances[id] < threshold)).reshape(-1).tolist() \
+            for id in range(distances.shape[0])]
+
+    to_remove = set()
+    for d in dupes:
+        if len(d) > 1:
+            for id in range(1, len(d)):
+                to_remove.add(d[id])
+    print("Found {} duplicates {}".format(len(to_remove), to_remove))
+    return to_remove
+
+def dedupe(path_in, threshold=0.1, file_type='*'):
+    X_fm, filenames = to_feature_maps(path_in, file_type=file_type)
+    print("####", X_fm.shape)
+
+    # normalize to use cosine similarity
+    X_fm_normalized = preprocessing.normalize(X_fm.reshape(len(X_fm), -1))
+
+    # number of clusters
+    K = 2
+
+    # # Dimensionality reduction through PCA.
+    # # This is optional.
+    # # We are using it mainly for plotting purposes.
+    X_reduced, pca = to_pca_reduced(X_fm_normalized, dimensions=K)
+
+    to_remove_idx = find_duplicates(X_reduced, threshold=threshold)
+
+    path_out = os.path.join(path_in, 'deduped')
+    # create the folder if it doesn't exist
+    pathlib.Path(path_out).mkdir(parents=True, exist_ok=True)
+
+    for id, filename_from in zip(range(len(filenames)), filenames):
+        if id not in to_remove_idx:
+            filename_out = os.path.join(path_out, os.path.basename(filename_from))
+            copyfile(filename_from, filename_out)
+            print("Copied {}".format(filename_out))
+    print("Done!")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-mode", action="store", type=Mode.argparse, choices=list(Mode), dest="mode")
     parser.add_argument("-path", action="store", dest="path", type=str)
     parser.add_argument("-centroids_json", action="store", dest="centroids_json", type=str)
-    parser.add_argument("-threshold", action="store", dest="threshold", type=int, default=80)
+    parser.add_argument("-threshold", action="store", dest="threshold", type=float, default=80)
 
     args = parser.parse_args()
 
@@ -226,5 +280,7 @@ if __name__ == '__main__':
         classify(args.path, args.centroids_json)
     elif args.mode == Mode.RESIZE:
         resize(args.path)
+    elif args.mode == Mode.DEDUPE:
+        dedupe(args.path, threshold=args.threshold)
     else:
-        raise ValueError("Specify either -cluster or -classify option")
+        raise ValueError("Specify [-cluster | -classify | -resize | -dedupe ] option")
