@@ -62,6 +62,21 @@ def glob_files(folder, file_type='*'):
 
     return paths
 
+def glob_folders(folder, file_type='*'):
+    search_string = os.path.join(folder, file_type)
+    files = glob.glob(search_string)
+
+    print('Searching ', search_string)
+    paths = []
+    for f in files:
+      if os.path.isdir(f):
+        paths.append(f)
+
+    # We sort the images in alphabetical order to match them
+    #  to the annotation files
+    paths.sort()
+
+    return paths
 
 def to_feature_maps(path, file_type="*.png"):
     def _to_feature_maps(X):
@@ -236,39 +251,54 @@ def find_duplicates(X_train_pca, threshold=0.1):
     print("Found {} duplicates {}".format(len(to_remove), to_remove))
     return to_remove
 
-def dedupe(path_in, threshold=0.1, file_type='*'):
-    X_fm, filenames = to_feature_maps(path_in, file_type=file_type)
-    print("####", X_fm.shape)
+def dedupe(path_in, path_out, threshold=0.1, file_type='*'):
+    subfolders_in = glob_folders(path_in, file_type=file_type)
 
-    # normalize to use cosine similarity
-    X_fm_normalized = preprocessing.normalize(X_fm.reshape(len(X_fm), -1))
+    if path_out is None:
+        path_out = os.path.join(path_in, 'deduped')
 
-    # number of clusters
-    K = 2
-
-    # # Dimensionality reduction through PCA.
-    # # This is optional.
-    # # We are using it mainly for plotting purposes.
-    X_reduced, pca = to_pca_reduced(X_fm_normalized, dimensions=K)
-
-    to_remove_idx = find_duplicates(X_reduced, threshold=threshold)
-
-    path_out = os.path.join(path_in, 'deduped')
     # create the folder if it doesn't exist
     pathlib.Path(path_out).mkdir(parents=True, exist_ok=True)
 
-    for id, filename_from in zip(range(len(filenames)), filenames):
-        if id not in to_remove_idx:
-            filename_out = os.path.join(path_out, os.path.basename(filename_from))
-            copyfile(filename_from, filename_out)
-            print("Copied {}".format(filename_out))
-    print("Done!")
+    for i, subfolder_in in zip(range(len(subfolders_in)), subfolders_in):
+
+        if i < 1:
+            print("Skipping " + subfolder_in)
+            continue
+
+        X_fm, filenames = to_feature_maps(subfolder_in, file_type=file_type)
+        print("####", X_fm.shape)
+
+        # normalize to use cosine similarity
+        X_fm_normalized = preprocessing.normalize(X_fm.reshape(len(X_fm), -1))
+
+        # number of clusters
+        K = 2
+
+        # # Dimensionality reduction through PCA.
+        # # This is optional.
+        # # We are using it mainly for plotting purposes.
+        X_reduced, pca = to_pca_reduced(X_fm_normalized, dimensions=K)
+
+        to_remove_idx = find_duplicates(X_reduced, threshold=threshold)
+
+        subfolder_out = os.path.join(path_out, os.path.basename(subfolder_in))
+        # create the folder if it doesn't exist
+        pathlib.Path(subfolder_out).mkdir(parents=True, exist_ok=True)
+
+        for id, filename_from in zip(range(len(filenames)), filenames):
+            if id not in to_remove_idx:
+                filename_out = os.path.join(subfolder_out, os.path.basename(filename_from))
+                copyfile(filename_from, filename_out)
+                print("Copied {}".format(filename_out))
+        print("Done!")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-mode", action="store", type=Mode.argparse, choices=list(Mode), dest="mode")
     parser.add_argument("-path", action="store", dest="path", type=str)
+    parser.add_argument("-path_out", action="store", dest="path_out", type=str)
     parser.add_argument("-centroids_json", action="store", dest="centroids_json", type=str)
     parser.add_argument("-threshold", action="store", dest="threshold", type=float, default=80)
 
@@ -281,6 +311,6 @@ if __name__ == '__main__':
     elif args.mode == Mode.RESIZE:
         resize(args.path)
     elif args.mode == Mode.DEDUPE:
-        dedupe(args.path, threshold=args.threshold)
+        dedupe(args.path, args.path_out, threshold=args.threshold)
     else:
         raise ValueError("Specify [-cluster | -classify | -resize | -dedupe ] option")
