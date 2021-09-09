@@ -6,30 +6,16 @@ from enum import Enum
 from lxml import etree
 
 
-import cv2
 import numpy as np
-from keras.applications.vgg16 import VGG16
-from keras.applications.vgg16 import preprocess_input
-from scipy.spatial.distance import cdist
-from sklearn import preprocessing  # to normalise
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from PIL import Image
-import pathlib
-from shutil import copyfile
 
 """
-Cluster images using CNN feature maps and PCA.
+convert label files into different formats
 """
 
 IMAGE_SIZE = 320
 
 
 class Mode(Enum):
-    CLUSTER = 'cluster'
-    CLASSIFY = 'classify'
-    RESIZE = 'resize'
-    DEDUPE = 'dedupe'
     CONVERT = 'convert'
 
     def __str__(self):
@@ -83,18 +69,15 @@ def glob_folders(folder, file_type='*'):
     return paths
 
 
-def to_json(path, data):
+def to_file(path, data):
     """
-    save json data to path
+    save data to path
     """
     with open(path,  'w', encoding="utf-8") as json_file:
         json_file.write(data)
-    # with open(path, 'w', encoding='utf-8') as file:
-    #     # json.dump(data, file, ensure_ascii=False, indent=4)
-    #     json.dump(data, file, ensure_ascii=False, indent=4)
 
 
-def from_json(path):
+def from_file(path):
     """
     save json data to path
     """
@@ -158,13 +141,14 @@ class ImageLabel:
         }.items()
 
     def __str__(self):
-        return json.dumps(self.__dict__, default=default, ensure_ascii=False)
-
-    def to_json(self):
-        return json.dumps(self.__dict__, ensure_ascii=False)
+        return json.dumps(dict(self), default=default, ensure_ascii=False)
 
     def __repr__(self):
-        return json.dumps(self.__dict__, ensure_ascii=False)
+        return self.__str__()
+
+    def to_json(self):
+        return self.__str__()
+
 
 class EdgeImpulseLabels:
     def __init__(self, bboxes):
@@ -185,10 +169,10 @@ class EdgeImpulseLabels:
         return json.dumps(dict(self), default=default, ensure_ascii=False)
 
     def __repr__(self):
-        return json.dumps(dict(self), ensure_ascii=False)
+        return self.__str__()
 
     def to_json(self):
-        return json.dumps(dict(self), ensure_ascii=False)
+        return self.__str__()
 
     def add_image_labels(self, filename, image_labels):
         self.bboxes[filename] = image_labels
@@ -227,7 +211,7 @@ def xml2pascalvoc(filename):
     # print(json.dumps(eilabels.__dict__, indent='  '))
     print(eilabels.__dict__)
     # print(json.dumps(eilabels, indent='  '))
-    to_json(".\\" + os.path.basename(filename) + '.json', str(eilabels.__dict__))
+    to_file(".\\" + os.path.basename(filename) + '.json', str(eilabels))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
