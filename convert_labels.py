@@ -188,9 +188,9 @@ def xml2pascalvoc(filename):
 
         labels = []
         for a in image_info[3]:
-            width = float(a[5]) - float(a[3])
-            height = float(a[6]) - float(a[4])
-            image_label = ImageLabel(a[0], int(float(a[3])), int(float(a[4])),
+            width = float(a[6]) - float(a[4])
+            height = float(a[7]) - float(a[5])
+            image_label = ImageLabel(a[0], int(float(a[4])), int(float(a[5])),
                                      int(width), int(height))
             labels.append(image_label)
 
@@ -211,7 +211,7 @@ def xml2pascalvoc(filename):
     # print(json.dumps(eilabels.__dict__, indent='  '))
     print(eilabels.__dict__)
     # print(json.dumps(eilabels, indent='  '))
-    to_file(".\\" + os.path.basename(filename) + '.json', str(eilabels))
+    to_file(".\\" + os.path.basename(filename) + '.json', str(eilabels.__dict__))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
