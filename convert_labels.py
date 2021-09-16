@@ -166,16 +166,22 @@ class EdgeImpulseLabels:
         }.items()
 
     def __str__(self):
-        return json.dumps(dict(self), default=default, ensure_ascii=False)
+        return json.dumps(dict(self), default=self.to_json, ensure_ascii=False)
 
     def __repr__(self):
-        return self.__str__()
+        return json.dumps(dict(self), default=self.to_json, ensure_ascii=False)
 
     def to_json(self):
-        return self.__str__()
+        to_return = {"version": self.version, "type": self.type}
+        image_boxes = {}
+        for key, boxes in self.bboxes.items():
+            jboxes = []
+            for box in boxes:
+                jboxes.append(box.__dict__)
+            image_boxes[key] = jboxes
 
-    def add_image_labels(self, filename, image_labels):
-        self.bboxes[filename] = image_labels
+        to_return["boundingBoxes"] = image_boxes
+        return to_return
 
 
 def xml2pascalvoc(filename):
@@ -209,9 +215,9 @@ def xml2pascalvoc(filename):
     eilabels = EdgeImpulseLabels(image_labels)
 
     # print(json.dumps(eilabels.__dict__, indent='  '))
-    print(eilabels.__dict__)
+    print(json.dumps(eilabels.to_json()))
     # print(json.dumps(eilabels, indent='  '))
-    to_file(".\\" + os.path.basename(filename) + '.json', str(eilabels.__dict__))
+    to_file(".\\" + os.path.basename(filename) + '.json', json.dumps(eilabels.to_json()))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
