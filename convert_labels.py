@@ -2,11 +2,11 @@ import argparse
 import glob
 import json
 import os
+from abc import ABC, abstractmethod
 from enum import Enum
-from lxml import etree
-
 
 import numpy as np
+from lxml import etree
 
 """
 convert label files into different formats
@@ -104,12 +104,13 @@ def from_file(path):
     return json.load(file)
 
 
-class Convertor:
+class Parser(ABC):
+    @abstractmethod
     def parse(self, path, file_type='*'):
         pass
 
 
-class KaggleXmlConvertor(Convertor):
+class KaggleXmlParser(Parser):
     def parse(self, folder, file_type='*'):
         def _parse_file(filename):
             width, height = 0, 0
@@ -135,14 +136,14 @@ class KaggleXmlConvertor(Convertor):
 
         for file in files:
             width, height, image_label = _parse_file(file)
-            basename = os.path.basename(file)
+            basename = os.path.basename(file).replace('.xml', '.png')
 
             image_labels.append([basename, width, height, np.array(image_label)])
 
         return np.array(image_labels)
 
 
-class CVATXmlConvertor(Convertor):
+class CVATXmlParser(Parser):
     def parse(self, filename, file_type='*'):
         image_labels = []
 
@@ -242,39 +243,53 @@ class EdgeImpulseLabels:
         return to_return
 
 
-def to_edge_impulse(path, convertor):
-    parsed = convertor.parse(path)
+class Convertor(ABC):
+    @abstractmethod
+    def convert(self, path, parser):
+        pass
 
-    image_labels = {}
 
-    for image_info in parsed:
-        image_filename = image_info[0]
+class EdgeImpulseConvertor(Convertor):
+    def convert(self, path, parser):
+        parsed = parser.parse(path)
 
-        print(image_info)
+        image_labels = {}
 
-        labels = []
-        for a in image_info[3]:
-            width = float(a[3]) - float(a[1])
-            height = float(a[4]) - float(a[2])
-            image_label = ImageLabel(a[0], int(float(a[1])), int(float(a[2])),
-                                     int(width), int(height))
-            labels.append(image_label)
+        for image_info in parsed:
+            image_filename = image_info[0]
 
-        image_labels[image_filename] = labels
+            # print(image_info)
 
-    eilabels = EdgeImpulseLabels(image_labels)
+            labels = []
+            for a in image_info[3]:
+                width = float(a[3]) - float(a[1])
+                height = float(a[4]) - float(a[2])
+                image_label = ImageLabel(a[0], int(float(a[1])), int(float(a[2])),
+                                         int(width), int(height))
+                labels.append(image_label)
 
-    print(json.dumps(eilabels.to_json(),  separators=(',', ':')))
-    to_file(".\\" + os.path.basename(path) + '.json', json.dumps(eilabels.to_json(), separators=(',', ':')))
+            image_labels[image_filename] = labels
+
+        ei_labels = EdgeImpulseLabels(image_labels)
+
+        print(json.dumps(ei_labels.to_json(),  separators=(',', ':')))
+        to_file(".\\" + os.path.basename(path) + '.json', json.dumps(ei_labels.to_json(), separators=(',', ':')))
 
 
 def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
-    if from_format == LabelFormat.CVAT_XML:
-        to_edge_impulse(args.path, CVATXmlConvertor())
-    elif from_format == LabelFormat.KAGGLE_XML:
-        to_edge_impulse(args.path, KaggleXmlConvertor())
+    convertor = None
+
+    if to_format == LabelFormat.EDGE_IMPULSE:
+        convertor = EdgeImpulseConvertor()
     else:
-        print('Unsupported format {}'.format(from_format))
+        print('Unsupported output format {}'.format(to_format))
+
+    if from_format == LabelFormat.CVAT_XML:
+        convertor.convert(path, CVATXmlParser())
+    elif from_format == LabelFormat.KAGGLE_XML:
+        convertor.convert(path, KaggleXmlParser())
+    else:
+        print('Unsupported input format {}'.format(from_format))
 
 
 if __name__ == '__main__':
