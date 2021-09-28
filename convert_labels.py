@@ -284,8 +284,9 @@ class YoloV5Convertor(Convertor):
                                          width/res_w, height/res_h)
                 labels.append(image_label)
 
-            sub_folder = os.path.join(os.path.dirname(path), os.path.basename(path)[:-4])
-            out_filename = os.path.join(sub_folder, image_filename[:-3] + 'txt')
+            # sub_folder = os.path.join(os.path.dirname(path), os.path.basename(path)[:-4])
+            # out_filename = os.path.join(sub_folder, image_filename[:-3] + 'txt')
+            out_filename = os.path.join(os.path.dirname(path), image_filename[:-3] + 'txt')
 
             # print(out_filename, labels)
             print("Writing ", out_filename)
