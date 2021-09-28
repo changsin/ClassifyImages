@@ -33,9 +33,10 @@ class Mode(Enum):
 
 
 class LabelFormat(Enum):
-    CVAT_XML = 'cvat_xml'
-    KAGGLE_XML = 'kaggle_xml'
-    EDGE_IMPULSE = 'edge_impulse'
+    CVAT_XML        = 'cvat_xml'
+    KAGGLE_XML      = 'kaggle_xml'
+    EDGE_IMPULSE    = 'edge_impulse'
+    YOLOV5          = 'yolov5'
 
     def __str__(self):
         return self.value
@@ -248,6 +249,51 @@ class Convertor(ABC):
     def convert(self, path, parser):
         pass
 
+# dashboard classes
+DASHBOARD_CLASSES = [   # warnings
+                    "warning@EPC", "warning@Stability", "warning@Tire", "warning@CentralMonitoring",
+                    "warning@Key", "warning@ABS", "warning@Engine", "warning@StabilityOn",
+                    "warning@StabilityOff", "warning@Washer", "warning@Steering", "warning@Brake",
+                        # alerts
+                    "alert@Retaining", "alert@Seatbelt", "alert@EngineOilPres",
+                    "alert@EngineOilTemp", "alert@Brake", "alert@Alternator"]
+
+
+class YoloV5Convertor(Convertor):
+    def convert(self, path, parser):
+        """
+        # change to yolo v5 format
+        # https://github.com/ultralytics/yolov5/issues/12
+        # [x_top_left, y_top_left, x_bottom_right, y_bottom_right] to
+        # [x_center, y_center, width, height]
+        """
+        parsed = parser.parse(path)
+
+        for image_info in parsed:
+            image_filename = image_info[0]
+            res_w = image_info[1]
+            res_h = image_info[2]
+
+            labels = []
+            for a in image_info[3]:
+                width = float(a[3]) - float(a[1])
+                height = float(a[4]) - float(a[2])
+                image_label = ImageLabel(a[0],
+                                         (float(a[1]) + width/2)/res_w,
+                                         (float(a[2]) + height/2)/res_h,
+                                         width/res_w, height/res_h)
+                labels.append(image_label)
+
+            sub_folder = os.path.join(os.path.dirname(path), os.path.basename(path)[:-4])
+            out_filename = os.path.join(sub_folder, image_filename[:-3] + 'txt')
+
+            # print(out_filename, labels)
+            print("Writing ", out_filename)
+            with open(out_filename, "w+") as file_out:
+                for label in labels:
+                    class_id = DASHBOARD_CLASSES.index(label.label)
+                    file_out.write("{} {} {} {} {}\n".format(class_id,
+                                                             label.x, label.y, label.width, label.height))
 
 class EdgeImpulseConvertor(Convertor):
     def convert(self, path, parser):
@@ -270,17 +316,14 @@ class EdgeImpulseConvertor(Convertor):
 
             image_labels[image_filename] = labels
 
-        ei_labels = EdgeImpulseLabels(image_labels)
-
-        print(json.dumps(ei_labels.to_json(),  separators=(',', ':')))
-        to_file(".\\" + os.path.basename(path) + '.json', json.dumps(ei_labels.to_json(), separators=(',', ':')))
-
 
 def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     convertor = None
 
     if to_format == LabelFormat.EDGE_IMPULSE:
         convertor = EdgeImpulseConvertor()
+    elif to_format == LabelFormat.YOLOV5:
+        convertor = YoloV5Convertor()
     else:
         print('Unsupported output format {}'.format(to_format))
 
@@ -296,10 +339,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-mode", action="store", type=Mode.argparse, choices=list(Mode), dest="mode")
     parser.add_argument("-format_in", action="store", type=LabelFormat.argparse, choices=list(LabelFormat), dest="format_in")
-    # parser.add_argument("-format_out", action="store", type=LabelFormat.argparse, choices=list(LabelFormat), dest="format_out")
+    parser.add_argument("-format_out", action="store", type=LabelFormat.argparse, choices=list(LabelFormat), dest="format_out")
     parser.add_argument("-path", action="store", dest="path", type=str)
     parser.add_argument("-path_out", action="store", dest="path_out", type=str)
 
     args = parser.parse_args()
 
-    convert_labels(args.path, args.format_in)
+    convert_labels(args.path, args.format_in, args.format_out)
