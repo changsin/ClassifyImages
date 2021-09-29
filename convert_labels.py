@@ -106,6 +106,9 @@ def from_file(path):
 
 
 class Parser(ABC):
+    def __init__(self):
+        self.labels = []
+
     @abstractmethod
     def parse(self, path, file_type='*'):
         pass
@@ -149,6 +152,12 @@ class CVATXmlParser(Parser):
         image_labels = []
 
         tree = etree.parse(filename)
+        print("Labels are: ")
+        for el in tree.xpath('meta/task/labels/label'):
+            label = el.xpath('name')[0].text
+            print("\"{}\", ".format(label), end="")
+            self.labels.append(label)
+
         for image in tree.xpath('image'):
             # print(image.attrib['name'])
             name = image.attrib['name']
@@ -163,12 +172,14 @@ class CVATXmlParser(Parser):
                 xbr = float(box.attrib['xbr'])
                 ybr = float(box.attrib['ybr'])
 
-                alertwarning = box.attrib['label']
-                wtype = box.xpath('attribute[@name="name"]')[0].text
+                label = box.attrib['label']
+                # wtype = box.xpath('attribute[@name="name"]')[0].text
                 # daynight = box.xpath('attribute[@name="daynight"]')[0].text
                 # visibility = int(box.xpath('attribute[@name="visibility"]')[0].text)
+                if box.xpath('attribute[@name="name"]'):
+                    label = "{}@{}".format(label, box.xpath('attribute[@name="name"]')[0].text)
 
-                box = "{}@{}".format(alertwarning, wtype), xtl, ytl, xbr, ybr
+                box = label, xtl, ytl, xbr, ybr
 
                 boxes.append(box)
 
@@ -258,6 +269,14 @@ DASHBOARD_CLASSES = [   # warnings
                     "alert@Retaining", "alert@Seatbelt", "alert@EngineOilPres",
                     "alert@EngineOilTemp", "alert@Brake", "alert@Alternator"]
 
+SIDEWALK_CLASSES = [
+    "wheelchair", "truck", "tree_trunk", "traffic_sign", "traffic_light",
+    "traffic_light_controller", "table", "stroller", "stop", "scooter",
+    "potted_plant", "power_controller", "pole", "person", "parking_meter",
+    "movable_signage", "motorcycle", "kiosk", "fire_hydrant", "dog",
+    "chair", "cat", "carrier", "car", "bus",
+    "bollard", "bicycle", "bench", "barricade" ]
+
 
 class YoloV5Convertor(Convertor):
     def convert(self, path, parser):
@@ -292,9 +311,11 @@ class YoloV5Convertor(Convertor):
             print("Writing ", out_filename)
             with open(out_filename, "w+") as file_out:
                 for label in labels:
-                    class_id = DASHBOARD_CLASSES.index(label.label)
+                    class_id = parser.labels.index(label.label)
                     file_out.write("{} {} {} {} {}\n".format(class_id,
                                                              label.x, label.y, label.width, label.height))
+        # [print(label) for label in enumerate(parser.labels)]
+        [print(label) for label in parser.labels]
 
 class EdgeImpulseConvertor(Convertor):
     def convert(self, path, parser):

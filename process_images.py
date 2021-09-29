@@ -66,7 +66,8 @@ def glob_folders(folder, file_type='*'):
     search_string = os.path.join(folder, file_type)
     files = glob.glob(search_string)
 
-    print('Searching ', search_string)
+    print('Searching ', search_string, files)
+
     paths = []
     for f in files:
       if os.path.isdir(f):
@@ -234,7 +235,7 @@ def resize(path_in, file_type='*'):
         filename_out = os.path.join(path_out, os.path.basename(file))
         image.save(filename_out)
 
-def find_duplicates(X_train_pca, threshold=0.1):
+def find_duplicates(X_train_pca, threshold=0.001):
     # Calculate distances of all points
     distances = cdist(X_train_pca, X_train_pca)
 
