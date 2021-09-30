@@ -155,6 +155,10 @@ class CVATXmlParser(Parser):
         print("Labels are: ")
         for el in tree.xpath('meta/task/labels/label'):
             label = el.xpath('name')[0].text
+
+            # # for now, this is for dashboard labels only
+            # for at in label.xpath('attributes/attribute'):
+
             print("\"{}\", ".format(label), end="")
             self.labels.append(label)
 
@@ -303,15 +307,16 @@ class YoloV5Convertor(Convertor):
                                          width/res_w, height/res_h)
                 labels.append(image_label)
 
-            # sub_folder = os.path.join(os.path.dirname(path), os.path.basename(path)[:-4])
-            # out_filename = os.path.join(sub_folder, image_filename[:-3] + 'txt')
-            out_filename = os.path.join(os.path.dirname(path), image_filename[:-3] + 'txt')
+            sub_folder = os.path.join(os.path.dirname(path), os.path.basename(path)[:-4])
+            out_filename = os.path.join(sub_folder, image_filename[:-3] + 'txt')
+            # out_filename = os.path.join(os.path.dirname(path), image_filename[:-3] + 'txt')
 
             # print(out_filename, labels)
             print("Writing ", out_filename)
             with open(out_filename, "w+") as file_out:
                 for label in labels:
-                    class_id = parser.labels.index(label.label)
+                    # class_id = parser.labels.index(label.label)
+                    class_id = DASHBOARD_CLASSES.index(label.label)
                     file_out.write("{} {} {} {} {}\n".format(class_id,
                                                              label.x, label.y, label.width, label.height))
         # [print(label) for label in enumerate(parser.labels)]
