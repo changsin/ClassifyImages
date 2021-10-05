@@ -1,0 +1,15 @@
+# modify to correct paths of your option
+# The paths assume that you are running from
+# /contents/yolov5
+train: /content/drive/MyDrive/data/Dashboard/train_d2
+val: /content/drive/MyDrive/data/Dashboard/val
+
+# number of classes
+nc: 18
+
+# class names
+names: [ "warning@EPC", "warning@Stability", "warning@Tire", "warning@CentralMonitoring",
+          "warning@Key", "warning@ABS", "warning@Engine", "warning@StabilityOn",
+          "warning@StabilityOff", "warning@Washer", "warning@Steering", "warning@Brake",
+          "alert@Retaining", "alert@Seatbelt", "alert@EngineOilPres",
+          "alert@EngineOilTemp", "alert@Brake", "alert@Alternator"]
