@@ -259,7 +259,7 @@ class EdgeImpulseLabels:
         return to_return
 
 
-class Convertor(ABC):
+class Converter(ABC):
     @abstractmethod
     def convert(self, path, parser):
         pass
@@ -282,7 +282,7 @@ SIDEWALK_CLASSES = [
     "bollard", "bicycle", "bench", "barricade" ]
 
 
-class YoloV5Convertor(Convertor):
+class YoloV5Converter(Converter):
     def convert(self, path, parser):
         """
         # change to yolo v5 format
@@ -322,7 +322,8 @@ class YoloV5Convertor(Convertor):
         # [print(label) for label in enumerate(parser.labels)]
         [print(label) for label in parser.labels]
 
-class EdgeImpulseConvertor(Convertor):
+
+class EdgeImpulseConverter(Converter):
     def convert(self, path, parser):
         parsed = parser.parse(path)
 
@@ -344,22 +345,48 @@ class EdgeImpulseConvertor(Convertor):
             image_labels[image_filename] = labels
 
 
+class CVATXmlConverter(Converter):
+    def convert(self, path, parser):
+        parsed = parser.parse(path)
+
+        image_labels = {}
+
+        for image_info in parsed:
+            image_filename = image_info[0]
+
+            # print(image_info)
+
+            labels = []
+            for a in image_info[3]:
+                width = float(a[3]) - float(a[1])
+                height = float(a[4]) - float(a[2])
+                image_label = ImageLabel(a[0], int(float(a[1])), int(float(a[2])),
+                                         int(width), int(height))
+                labels.append(image_label)
+
+            image_labels[image_filename] = labels
+
 def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
+    parser = None
     convertor = None
 
+    if from_format == LabelFormat.CVAT_XML:
+        parser = CVATXmlParser()
+    elif from_format == LabelFormat.KAGGLE_XML:
+        parser = KaggleXmlParser()
+    else:
+        print('Unsupported input format {}'.format(from_format))
+
     if to_format == LabelFormat.EDGE_IMPULSE:
-        convertor = EdgeImpulseConvertor()
+        convertor = EdgeImpulseConverter()
     elif to_format == LabelFormat.YOLOV5:
-        convertor = YoloV5Convertor()
+        convertor = YoloV5Converter()
+    elif to_format == LabelFormat.CVAT_XML:
+        convertor = CVATXmlConverter()
     else:
         print('Unsupported output format {}'.format(to_format))
 
-    if from_format == LabelFormat.CVAT_XML:
-        convertor.convert(path, CVATXmlParser())
-    elif from_format == LabelFormat.KAGGLE_XML:
-        convertor.convert(path, KaggleXmlParser())
-    else:
-        print('Unsupported input format {}'.format(from_format))
+    convertor.convert(path, parser)
 
 
 if __name__ == '__main__':
