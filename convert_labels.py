@@ -4,7 +4,7 @@ import json
 import os
 from abc import ABC, abstractmethod
 from enum import Enum
-
+import shutil
 import numpy as np
 from lxml import etree
 
@@ -17,6 +17,7 @@ IMAGE_SIZE = 320
 
 class Mode(Enum):
     CONVERT = 'convert'
+    REMOVE_UNLABELED_FILES = 'remove_unlabeled_files'
 
     def __str__(self):
         return self.value
@@ -415,11 +416,28 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if os.path.isdir(args.path):
-        files = glob_files(args.path, file_type='*.xml')
+    if args.mode == Mode.REMOVE_UNLABELED_FILES:
+        parent_folder = args.path[:args.path[:-2].rfind('\\'):]
+        args.path_out = os.path.join(parent_folder, "unlabeled")
+        if not os.path.exists(args.path_out):
+            os.mkdir(args.path_out)
 
-        for file in files:
-            print(file)
-            convert_labels(file, args.format_in, args.format_out)
+        if os.path.isdir(args.path):
+            # files = glob_files(args.path, file_type='*')
+            files = glob_files(args.path, file_type='*.jpg')
+
+            for file in files:
+                txt_file = os.path.basename(file)[:-3] + 'txt'
+                txt_file = os.path.join(os.path.dirname(file), txt_file)
+                if not os.path.exists(txt_file):
+                    print('does not have a label file:', txt_file)
+                    dest = os.path.join(args.path_out, os.path.basename(file))
+                    shutil.move(file, dest)
     else:
-        convert_labels(args.path, args.format_in, args.format_out)
+        if os.path.isdir(args.path):
+            files = glob_files(args.path, file_type='*')
+
+            for file in files:
+                convert_labels(file, args.format_in, args.format_out)
+        else:
+            convert_labels(args.path, args.format_in, args.format_out)
