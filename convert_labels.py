@@ -157,10 +157,18 @@ class CVATXmlParser(Parser):
             label = el.xpath('name')[0].text
 
             # # for now, this is for dashboard labels only
-            # for at in label.xpath('attributes/attribute'):
+            for sub_el in el.xpath('attributes/attribute'):
+                if sub_el.xpath('name')[0].text == 'name':
+                    values = sub_el.xpath('values')[0].text.split()
 
-            print("\"{}\", ".format(label), end="")
-            self.labels.append(label)
+                    for value in values:
+                        value = value.strip()
+                        self.labels.append("{}@{}".format(label, value))
+            #
+            #     print("\"{}\", ".format(at[0].text), end="")
+            #     self.labels.append(at)
+
+        self.labels.sort()
 
         for image in tree.xpath('image'):
             # print(image.attrib['name'])
@@ -265,13 +273,19 @@ class Converter(ABC):
         pass
 
 # dashboard classes
-DASHBOARD_CLASSES = [   # warnings
-                    "warning@EPC", "warning@Stability", "warning@Tire", "warning@CentralMonitoring",
-                    "warning@Key", "warning@ABS", "warning@Engine", "warning@StabilityOn",
-                    "warning@StabilityOff", "warning@Washer", "warning@Steering", "warning@Brake",
-                        # alerts
-                    "alert@Retaining", "alert@Seatbelt", "alert@EngineOilPres",
-                    "alert@EngineOilTemp", "alert@Brake", "alert@Alternator"]
+DASHBOARD_CLASSES = [
+                    "alert@Alternator", "alert@Brake", "alert@Coolant",
+                    "alert@Distance", "alert@EngineOil", "alert@EngineOilTemp",
+                    "alert@Parking", "alert@Retaining", "alert@Seatbelt",
+                    "alert@Steering",
+
+                    "warning@ABS", "warning@Brake", "warning@BrakeWear",
+                    "warning@CentralMonitoring", "warning@EPC", "warning@Engine",
+                    "warning@Fuel", "warning@Glow", "warning@Headlamp",
+                    "warning@Lamp", "warning@Parking", "warning@Retaining",
+                    "warning@StabilityOff", "warning@StabilityOn", "warning@Steering",
+                    "warning@TPMS", "warning@Tire", "warning@Washer"
+]
 
 SIDEWALK_CLASSES = [
     "wheelchair", "truck", "tree_trunk", "traffic_sign", "traffic_light",
@@ -290,6 +304,7 @@ class YoloV5Converter(Converter):
         # [x_top_left, y_top_left, x_bottom_right, y_bottom_right] to
         # [x_center, y_center, width, height]
         """
+
         parsed = parser.parse(path)
 
         for image_info in parsed:
@@ -320,7 +335,7 @@ class YoloV5Converter(Converter):
                     file_out.write("{} {} {} {} {}\n".format(class_id,
                                                              label.x, label.y, label.width, label.height))
         # [print(label) for label in enumerate(parser.labels)]
-        [print(label) for label in parser.labels]
+        [print("\"{}\",".format(label)) for label in parser.labels]
 
 
 class EdgeImpulseConverter(Converter):
@@ -366,6 +381,7 @@ class CVATXmlConverter(Converter):
 
             image_labels[image_filename] = labels
 
+
 def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     parser = None
     convertor = None
@@ -399,4 +415,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    convert_labels(args.path, args.format_in, args.format_out)
+    if os.path.isdir(args.path):
+        files = glob_files(args.path, file_type='*.xml')
+
+        for file in files:
+            print(file)
+            convert_labels(file, args.format_in, args.format_out)
+    else:
+        convert_labels(args.path, args.format_in, args.format_out)
