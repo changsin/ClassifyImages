@@ -526,17 +526,53 @@ def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     convertor.convert(path, parser)
 
 
-def filter_files(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
-    def filter_by_label(parsed, label):
-        filtered = []
-        for image_info in parsed:
-            for box in image_info[-1]:
-                if label == box[0]:
-                    # print("Adding ", image_info[0], label, box)
-                    filtered.append(image_info)
-                    break
+TO_EXCLUDE = [
+    "alert@Retaining",
+    "alert@Distance",
+    "warning@ABS",
+    "alert@Coolant",
+    "warning@Fuel",
+    "warning@Retaining",
+    "warning@Steering",
+    "alert@EngineOilTemp",
+    "warning@Glow",
+    "warning@CentralMonitoring",
+    "warning@EPC",
+    "warning@Washer"
+]
 
-        return filtered
+def filter_files(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
+    # check for file name dupes
+    def _is_dupe(image_info, flist):
+        for f in flist:
+            if f[0] == image_info[0]:
+                print("Dupe found {}".format(f))
+                return True
+        return False
+
+    def filter_by_labels(parsed, labels, is_in=True):
+        filtered = []
+        dupe_count = 0
+        for image_info in parsed:
+            if _is_dupe(image_info, filtered):
+                dupe_count += 1
+                print("Skipping")
+                continue
+
+            match_found = False
+            for box in image_info[-1]:
+                if box[0] in labels:
+                    match_found = True
+                    # print("Adding ", image_info[0], label, box)
+                    if is_in:
+                        filtered.append(image_info)
+                        break
+
+            # if it's a negative case, wait till all labels are tried before adding to filtered
+            if not is_in and not match_found:
+                filtered.append(image_info)
+
+        return filtered, dupe_count
 
     cvat_files = []
     if os.path.isdir(path):
@@ -559,42 +595,51 @@ def filter_files(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         p = parser.parse(file)
         parsed.extend(p)
 
-    label_to_filer = "alert@Seatbelt"
-    # label_to_filer = "warning@Engine"
-    filtered = filter_by_label(parsed, label_to_filer)
-    # print(filtered)
-
-    if to_format == LabelFormat.EDGE_IMPULSE:
-        convertor = EdgeImpulseConverter()
-    elif to_format == LabelFormat.YOLOV5:
-        convertor = YoloV5Converter()
-    elif to_format == LabelFormat.CVAT_XML:
-        convertor = CVATXmlConverter()
-    else:
-        print('Unsupported output format {}'.format(to_format))
-
-    print("Found {}".format(len(filtered)))
-
-    random.shuffle(filtered)
-
-    # Write 100 by
-    from_id = 0
-    to_id = 100
-    for folder_id in range(10):
-        chunk = filtered[from_id:to_id]
-        print("Chunk is ", len(chunk))
-
-        path_out = os.path.join(os.path.dirname(path),
-                                "{}_{}.xml".format(label_to_filer, folder_id))
-
-        project_name = "{}_{}".format(label_to_filer, folder_id)
-        convertor.write(project_name, chunk, path_out)
-
-        # move all data files
-        move_data_files(os.path.dirname(path), project_name, chunk)
-
-        from_id = to_id + 1
-        to_id = from_id + 100
+    # filtered = parsed
+    # labels_to_filter = ["warning@Engine"]
+    # labels_to_filter = ["alert@Steering"] - 21
+    # labels_to_filter = ["warning@Parking"] - 84
+    # labels_to_filter = ["warning@Brake"] - 206
+    # labels_to_filter = ["warning@StabilityOff"] - 228
+    # labels_to_filter = ["warning@StabilityOn"] - 273
+    # labels_to_filter = ["warning@Tire"] - 345
+    # labels_to_filter = ["alert@Brake"] - 468
+    filtered, dupe_count = filter_by_labels(parsed, TO_EXCLUDE, is_in=False)
+    # filtered, dupe_count = filter_by_labels(filtered, labels_to_filter)
+    print(len(filtered), "dupe:", dupe_count)
+    #
+    # if to_format == LabelFormat.EDGE_IMPULSE:
+    #     convertor = EdgeImpulseConverter()
+    # elif to_format == LabelFormat.YOLOV5:
+    #     convertor = YoloV5Converter()
+    # elif to_format == LabelFormat.CVAT_XML:
+    #     convertor = CVATXmlConverter()
+    # else:
+    #     print('Unsupported output format {}'.format(to_format))
+    #
+    # print("Found {}".format(len(filtered)))
+    #
+    # random.shuffle(filtered)
+    #
+    # folder_prefix = "test10"
+    # # Write 100 by
+    # from_id = 0
+    # to_id = 400
+    # for folder_id in range(1):
+    #     chunk = filtered[from_id:to_id]
+    #     print("Chunk is ", len(chunk))
+    #
+    #     path_out = os.path.join(os.path.dirname(path),
+    #                             "{}_{}.xml".format(folder_prefix, folder_id))
+    #
+    #     project_name = "{}_{}".format(folder_prefix, folder_id)
+    #     convertor.write(project_name, chunk, path_out)
+    #
+    #     # move all data files
+    #     move_data_files(os.path.dirname(path), project_name, chunk)
+    #
+    #     from_id = to_id + 1
+    #     to_id = from_id + 100
 
 
 def move_data_files(parent_folder, folder_to, chunk):
@@ -632,7 +677,7 @@ def move_data_files(parent_folder, folder_to, chunk):
                 print("ERROR: target {} already exists".format(dest_txt))
                 exit(-1)
 
-            shutil.copy(image_file, dest_txt)
+            shutil.copy(txt_file, dest_txt)
             moved_count += 1
         else:
             print("ERROR: source {} does not exist".format(txt_file))
