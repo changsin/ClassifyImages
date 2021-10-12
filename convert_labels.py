@@ -441,7 +441,6 @@ class CVATXmlConverter(Converter):
         with open("test.xml", "wb") as xml:
             xml.write(ET.tostring(tree_out, pretty_print=True))
 
-
     def write(self, project_name, parsed, path_out):
         tree_out = ET.parse(".\\data\\labels\\cvat_template.xml")
 
