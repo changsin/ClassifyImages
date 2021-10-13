@@ -1,0 +1,21 @@
+# modify to correct paths of your option
+# The paths assume that you are running from
+# /contents/yolov5
+#train: /content/drive/MyDrive/data/Phase3/train/alert@Seatbelt_0
+val: /content/drive/MyDrive/data/Phase3/test_lite
+
+# number of classes
+nc: 28
+
+# class names
+names: ["alert@Alternator", "alert@Brake", "alert@Coolant",
+        "alert@Distance", "alert@EngineOil", "alert@EngineOilTemp",
+        "alert@Parking", "alert@Retaining", "alert@Seatbelt",
+        "alert@Steering",
+
+        "warning@ABS", "warning@Brake", "warning@BrakeWear",
+        "warning@CentralMonitoring", "warning@EPC", "warning@Engine",
+        "warning@Fuel", "warning@Glow", "warning@Headlamp",
+        "warning@Lamp", "warning@Parking", "warning@Retaining",
+        "warning@StabilityOff", "warning@StabilityOn", "warning@Steering",
+        "warning@TPMS", "warning@Tire", "warning@Washer"]
