@@ -1,0 +1,17 @@
+# modify to correct paths of your option
+# The paths assume that you are running from
+# /contents/yolov5
+train: /content/drive/MyDrive/data/SW4/train
+val: /content/drive/MyDrive/data/SW4/val
+
+# number of classes
+nc: 29
+
+# class names
+names: [
+    "wheelchair", "truck", "tree_trunk", "traffic_sign", "traffic_light",
+    "traffic_light_controller", "table", "stroller", "stop", "scooter",
+    "potted_plant", "power_controller", "pole", "person", "parking_meter",
+    "movable_signage", "motorcycle", "kiosk", "fire_hydrant", "dog",
+    "chair", "cat", "carrier", "car", "bus",
+    "bollard", "bicycle", "bench", "barricade"]

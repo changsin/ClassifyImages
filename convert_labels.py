@@ -9,7 +9,6 @@ from enum import Enum
 
 import numpy as np
 import random
-import urllib
 
 
 from lxml import etree as ET
@@ -113,6 +112,10 @@ def from_file(path):
     return json.load(file)
 
 
+def get_parent_folder(path):
+    return path[:path[:-2].rfind('\\'):]
+
+
 class Parser(ABC):
     def __init__(self):
         self.labels = []
@@ -162,25 +165,27 @@ class CVATXmlParser(Parser):
         tree = ET.parse(filename)
         # print("Labels are: ")
 
-        project_name = tree.xpath('meta/task/project')[0].text
-        task_name = tree.xpath('meta/task/name')[0].text
+        # project_name = tree.xpath('meta/task/project')[0].text
+        # task_name = tree.xpath('meta/task/name')[0].text
+        task_name = os.path.basename(get_parent_folder(filename))
+        project_name = task_name
 
-        for el in tree.xpath('meta/task/labels/label'):
-            label = el.xpath('name')[0].text
-
-            # # for now, this is for dashboard labels only
-            for sub_el in el.xpath('attributes/attribute'):
-                if sub_el.xpath('name')[0].text == 'name':
-                    values = sub_el.xpath('values')[0].text.split()
-
-                    for value in values:
-                        value = value.strip()
-                        self.labels.append("{}@{}".format(label, value))
-            #
-            #     print("\"{}\", ".format(at[0].text), end="")
-            #     self.labels.append(at)
-
-        self.labels.sort()
+        # for el in tree.xpath('meta/task/labels/label'):
+        #     label = el.xpath('name')[0].text
+        #
+        #     # # for now, this is for dashboard labels only
+        #     for sub_el in el.xpath('attributes/attribute'):
+        #         if sub_el.xpath('name')[0].text == 'name':
+        #             values = sub_el.xpath('values')[0].text.split()
+        #
+        #             for value in values:
+        #                 value = value.strip()
+        #                 self.labels.append("{}@{}".format(label, value))
+        #     #
+        #     #     print("\"{}\", ".format(at[0].text), end="")
+        #     #     self.labels.append(at)
+        #
+        # self.labels.sort()
 
         for image in tree.xpath('image'):
             # print(image.attrib['name'])
@@ -203,15 +208,18 @@ class CVATXmlParser(Parser):
                 # wtype = box.xpath('attribute[@name="name"]')[0].text
                 # daynight = box.xpath('attribute[@name="daynight"]')[0].text
                 # visibility = int(box.xpath('attribute[@name="visibility"]')[0].text)
-                if box.xpath('attribute[@name="name"]'):
-                    label = "{}@{}".format(label, box.xpath('attribute[@name="name"]')[0].text)
+                # if box.xpath('attribute[@name="name"]'):
+                #     label = "{}@{}".format(label, box.xpath('attribute[@name="name"]')[0].text)
 
                 # add other attributes too
-                daynight = box.xpath('attribute[@name="daynight"]')[0].text
-                visibility = box.xpath('attribute[@name="visibility"]')[0].text
-                box = label, xtl, ytl, xbr, ybr, occluded, z_order, daynight, visibility
+                # daynight = box.xpath('attribute[@name="daynight"]')[0].text
+                # visibility = box.xpath('attribute[@name="visibility"]')[0].text
+                # box = label, xtl, ytl, xbr, ybr, occluded, z_order, daynight, visibility
+                box = label, xtl, ytl, xbr, ybr, occluded, z_order
 
-                boxes.append(box)
+                # only add what we care right now
+                if label in SW_EX1:
+                    boxes.append(box)
 
             image_labels.append([name, width, height, project_name, task_name, np.array(boxes)])
 
@@ -290,7 +298,7 @@ class Converter(ABC):
     def convert(self, path, parser):
         pass
 
-# dashboard classes
+
 DASHBOARD_CLASSES = [
                     "alert@Alternator", "alert@Brake", "alert@Coolant",
                     "alert@Distance", "alert@EngineOil", "alert@EngineOilTemp",
@@ -304,13 +312,83 @@ DASHBOARD_CLASSES = [
                     "warning@StabilityOff", "warning@StabilityOn", "warning@Steering",
                     "warning@TPMS", "warning@Tire", "warning@Washer"]
 
+DB_EXCLUDE = [
+    # "alert@Retaining",
+    # "alert@Distance",
+    # "warning@ABS",
+    # "alert@Coolant",
+    # "warning@Fuel",
+    "warning@Retaining",
+    "warning@Steering",
+    "alert@EngineOilTemp",
+    "warning@Glow",
+    "warning@CentralMonitoring",
+    "warning@EPC",
+    "warning@Washer"
+]
+
+DB_TOPS = [
+    # Top 5
+    "alert@Seatbelt",
+    "warning@Engine",
+    "alert@Parking",
+    "warning@Tire",
+    "warning@StabilityOn",
+
+    # Top 10
+    "alert@Brake",
+    "warning@StabilityOff",
+    "warning@Brake",
+    "alert@Steering",
+    "warning@Parking",
+
+    # Top 15
+    "alert@Retaining",
+    "alert@Distance",
+    "warning@ABS",
+    "alert@Coolant",
+    "warning@Fuel"
+]
+
+DB_TOP5 = DB_TOPS[:5]
+DB_TOP10 = DB_TOPS[5:10]
+DB_TOP15 = DB_TOPS[10:15]
+
 SIDEWALK_CLASSES = [
     "wheelchair", "truck", "tree_trunk", "traffic_sign", "traffic_light",
     "traffic_light_controller", "table", "stroller", "stop", "scooter",
     "potted_plant", "power_controller", "pole", "person", "parking_meter",
     "movable_signage", "motorcycle", "kiosk", "fire_hydrant", "dog",
     "chair", "cat", "carrier", "car", "bus",
-    "bollard", "bicycle", "bench", "barricade" ]
+    "bollard", "bicycle", "bench", "barricade"]
+
+SW_EX1 = ["truck", "person", "car", "bus"]
+
+# 11
+SW_EXCLUDE = [
+    "tree_trunk", "traffic_sign", "traffic_light",
+    "potted_plant", "pole",
+    "movable_signage", "motorcycle",
+    "chair",
+    "bollard", "bicycle", "bench"]
+
+# 14
+SW_IGNORE = [
+        "barricade",
+        "carrier",
+        "cat"
+        "dog",
+        "fire_hydrant",
+        "kiosk",
+        "parking_meter",
+        "power_controller",
+        "table",
+        "traffic_light_controller",
+        "scooter",
+        "stop",
+        "stroller",
+        "wheelchair",
+    ]
 
 
 class YoloV5Converter(Converter):
@@ -340,15 +418,15 @@ class YoloV5Converter(Converter):
                 labels.append(image_label)
 
             sub_folder = os.path.join(os.path.dirname(path), os.path.basename(path)[:-4])
-            out_filename = os.path.join(sub_folder, image_filename[:-3] + 'txt')
-            # out_filename = os.path.join(os.path.dirname(path), image_filename[:-3] + 'txt')
+            # out_filename = os.path.join(sub_folder, image_filename[:-3] + 'txt')
+            out_filename = os.path.join(os.path.dirname(sub_folder), image_filename[:-3] + 'txt')
 
             # print(out_filename, labels)
-            print("Writing ", out_filename)
+            # print("Writing ", out_filename)
             with open(out_filename, "w+") as file_out:
                 for label in labels:
                     # class_id = parser.labels.index(label.label)
-                    class_id = DASHBOARD_CLASSES.index(label.label)
+                    class_id = SIDEWALK_CLASSES.index(label.label)
                     file_out.write("{} {} {} {} {}\n".format(class_id,
                                                              label.x, label.y, label.width, label.height))
         # [print(label) for label in enumerate(parser.labels)]
@@ -381,7 +459,7 @@ class CVATXmlConverter(Converter):
     def convert(self, path, parser):
         parsed = parser.parse(path)
 
-        tree_out = ET.parse(".\\data\\labels\\cvat_template.xml")
+        tree_out = ET.parse(".\\data\\labels\\cvat_dashboard.xml")
         # print("Labels are: ")
         # for el in tree_out.xpath('meta/task/labels/label'):
 
@@ -428,21 +506,21 @@ class CVATXmlConverter(Converter):
                 # notice that it's the sixth token
                 el_box.set('z_order', a[6])
 
-                # add attributes
-                el_name = ET.SubElement(el_box, 'attribute')
-                el_name.set('name', tokens[1])
-
-                el_daynight = ET.SubElement(el_box, 'attribute')
-                el_daynight.set('daynight', a[7])
-
-                el_visibility = ET.SubElement(el_box, 'attribute')
-                el_visibility.set('visibility', a[8])
+                # # add attributes
+                # el_name = ET.SubElement(el_box, 'attribute')
+                # el_name.set('name', tokens[1])
+                #
+                # el_daynight = ET.SubElement(el_box, 'attribute')
+                # el_daynight.set('daynight', a[7])
+                #
+                # el_visibility = ET.SubElement(el_box, 'attribute')
+                # el_visibility.set('visibility', a[8])
 
         with open("test.xml", "wb") as xml:
             xml.write(ET.tostring(tree_out, pretty_print=True))
 
     def write(self, project_name, parsed, path_out):
-        tree_out = ET.parse(".\\data\\labels\\cvat_template.xml")
+        tree_out = ET.parse(".\\data\\labels\\cvat_sidewalk.xml")
 
         datetime_now = datetime.datetime.now()
         el_created = tree_out.xpath('meta/task/created')
@@ -452,11 +530,11 @@ class CVATXmlConverter(Converter):
         el_updated[0].text = str(datetime_now)
         el_dumped[0].text = str(datetime_now)
 
-        el_project_name = tree_out.xpath('meta/task/project')
+        # el_project_name = tree_out.xpath('meta/task/project')
         el_task_name = tree_out.xpath('meta/task/name')
         # project_name = parsed[0][3]
         # task_name = parsed[0][4]
-        el_project_name[0].text = project_name
+        # el_project_name[0].text = project_name
         el_task_name[0].text = project_name
 
         el_root = tree_out.getroot()
@@ -472,7 +550,6 @@ class CVATXmlConverter(Converter):
 
             # print(image_info)
             #
-            labels = []
             for a in image_info[-1]:
                 el_box = ET.SubElement(el_image, 'box')
                 tokens = a[0].split('@')
@@ -488,21 +565,22 @@ class CVATXmlConverter(Converter):
                 # notice that it's the sixth token
                 el_box.set('z_order', a[6])
 
-                # add attributes
-                el_name = ET.SubElement(el_box, 'attribute')
-                el_name.set('name', 'name')
-                el_name.text = tokens[1]
+                # # add attributes
+                # el_name = ET.SubElement(el_box, 'attribute')
+                # el_name.set('name', 'name')
+                # el_name.text = tokens[1]
 
-                el_daynight = ET.SubElement(el_box, 'attribute')
-                el_daynight.set('name', 'daynight')
-                el_daynight.text = a[7]
-
-                el_visibility = ET.SubElement(el_box, 'attribute')
-                el_visibility.set('name', 'visibility')
-                el_visibility.text = a[8]
+                # el_daynight = ET.SubElement(el_box, 'attribute')
+                # el_daynight.set('name', 'daynight')
+                # el_daynight.text = a[7]
+                #
+                # el_visibility = ET.SubElement(el_box, 'attribute')
+                # el_visibility.set('name', 'visibility')
+                # el_visibility.text = a[8]
 
         with open(path_out, "wb") as xml:
             xml.write(ET.tostring(tree_out, pretty_print=True))
+
 
 def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     parser = None
@@ -525,49 +603,6 @@ def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         print('Unsupported output format {}'.format(to_format))
 
     convertor.convert(path, parser)
-
-
-TO_EXCLUDE = [
-    # "alert@Retaining",
-    # "alert@Distance",
-    # "warning@ABS",
-    # "alert@Coolant",
-    # "warning@Fuel",
-    "warning@Retaining",
-    "warning@Steering",
-    "alert@EngineOilTemp",
-    "warning@Glow",
-    "warning@CentralMonitoring",
-    "warning@EPC",
-    "warning@Washer"
-]
-
-TOPS = [
-    # Top 5
-    "alert@Seatbelt",
-    "warning@Engine",
-    "alert@Parking",
-    "warning@Tire",
-    "warning@StabilityOn",
-
-    # Top 10
-    "alert@Brake",
-    "warning@StabilityOff",
-    "warning@Brake",
-    "alert@Steering",
-    "warning@Parking",
-
-    # Top 15
-    "alert@Retaining",
-    "alert@Distance",
-    "warning@ABS",
-    "alert@Coolant",
-    "warning@Fuel"
-]
-
-TOP5 = TOPS[:5]
-TOP10 = TOPS[5:10]
-TOP15 = TOPS[10:15]
 
 
 def filter_by_labels(parsed, labels, is_in=True):
@@ -602,7 +637,39 @@ def filter_by_labels(parsed, labels, is_in=True):
 
     return filtered, dupe_count
 
-import operator
+
+def filter_by_visibility(parsed, visibilities, is_in=True):
+    # check for file name dupes
+    def _is_dupe(image_info, flist):
+        for f in flist:
+            if f[0] == image_info[0]:
+                # print("Dupe found {}".format(f))
+                return True
+        return False
+
+    filtered = []
+    dupe_count = 0
+    for image_info in parsed:
+        if _is_dupe(image_info, filtered):
+            dupe_count += 1
+            # print("Skipping")
+            continue
+
+        match_found = False
+        for box in image_info[-1]:
+            if box[-1] in visibilities:
+                match_found = True
+                # print("Adding ", image_info[0], label, box)
+                if is_in:
+                    filtered.append(image_info)
+                    break
+
+        # if it's a negative case, wait till all labels are tried before adding to filtered
+        if not is_in and not match_found:
+            filtered.append(image_info)
+
+    return filtered, dupe_count
+
 
 def count_labels(image_infos):
     label_counts = dict()
@@ -619,12 +686,15 @@ def count_labels(image_infos):
     return label_counts
 
 
-def filter_files(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
+def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     cvat_files = []
-    if os.path.isdir(path):
-        cvat_files = glob_files(path, file_type='*.xml')
+    folders = glob_folders(args.path_in, file_type='*')
+    if folders:
+        for folder in folders:
+            cvat_files.extend(glob_files(folder, file_type='*.xml'))
+    # print(files)
     else:
-        cvat_files.append(path)
+        cvat_files = glob_files(args.path_in, file_type='*.xml')
 
     parser = None
     convertor = None
@@ -642,9 +712,16 @@ def filter_files(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         parsed.extend(p)
 
     # filtered = parsed
-    filtered, dupe_count = filter_by_labels(parsed, TO_EXCLUDE, is_in=False)
-    # filtered, dupe_count = filter_by_labels(filtered, labels_to_filter)
+    labels_to_filter = SW_EX1
+    # filtered, dupe_count = filter_by_labels(parsed, SW_EXCLUDE, is_in=False)
+    # filtered, dupe_count = filter_by_labels(filtered, TOP15, is_in=False)
+    # filtered, dupe_count = filter_by_labels(filtered, TOP10, is_in=False)
+    # filtered, dupe_count = filter_by_labels(filtered, ["alert@Seatbelt"])
+    filtered, dupe_count = filter_by_labels(parsed, SW_EX1)
+    # filtered, dupe_count = filter_by_visibility(filtered, ['1', '2'])
     print(len(filtered), "dupe:", dupe_count)
+    print(count_labels(filtered))
+    # exit(0)
 
     if to_format == LabelFormat.EDGE_IMPULSE:
         convertor = EdgeImpulseConverter()
@@ -655,11 +732,9 @@ def filter_files(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     else:
         print('Unsupported output format {}'.format(to_format))
 
-    print("Found {}".format(len(filtered)))
-
     random.shuffle(filtered)
 
-    folder_prefix = "train_top15"
+    folder_prefix = "sw4_train"
     # Write 100 by
     from_id = 0
     to_id = 100
@@ -668,15 +743,17 @@ def filter_files(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         print("Chunk is ", len(chunk))
         print(sorted(count_labels(chunk).items()))
 
-        path_out = os.path.join(os.path.dirname(path),
-                                "{}_{}.xml".format(folder_prefix, folder_id))
+        # path_out = os.path.join(os.path.dirname(path_in),
+        path_out=os.path.join(path_in,
+                              "{}_{}.xml".format(folder_prefix, folder_id))
 
         project_name = "{}_{}".format(folder_prefix, folder_id)
         # convertor.write(project_name, chunk, path_out)
         convertor.write(project_name, chunk, path_out)
 
         # move all data files
-        move_data_files(os.path.dirname(path), project_name, chunk)
+        print(f"#project_name: {project_name} {path_in}")
+        move_data_files(path_in, project_name, chunk)
 
         from_id = to_id + 1
         to_id = from_id + 100
@@ -728,22 +805,24 @@ def move_data_files(parent_folder, folder_to, chunk):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-mode", action="store", type=Mode.argparse, choices=list(Mode), dest="mode")
-    parser.add_argument("-format_in", action="store", type=LabelFormat.argparse, choices=list(LabelFormat), dest="format_in")
-    parser.add_argument("-format_out", action="store", type=LabelFormat.argparse, choices=list(LabelFormat), dest="format_out")
-    parser.add_argument("-path", action="store", dest="path", type=str)
-    parser.add_argument("-path_out", action="store", dest="path_out", type=str)
+    parser.add_argument("--mode", action="store", type=Mode.argparse, choices=list(Mode), dest="mode")
+    parser.add_argument("--format_in", action="store", type=LabelFormat.argparse, choices=list(LabelFormat), dest="format_in")
+    parser.add_argument("--format_out", action="store", type=LabelFormat.argparse, choices=list(LabelFormat), dest="format_out")
+    parser.add_argument("--path_in", action="store", dest="path_in", type=str)
+    parser.add_argument("--path_out", action="store", dest="path_out", type=str)
 
     args = parser.parse_args()
+    print(args.mode)
+
     if args.mode == Mode.REMOVE_UNLABELED_FILES:
-        parent_folder = args.path[:args.path[:-2].rfind('\\'):]
+        parent_folder = args.path_in[:args.path_in[:-2].rfind('\\'):]
         args.path_out = os.path.join(parent_folder, "unlabeled")
         if not os.path.exists(args.path_out):
             os.mkdir(args.path_out)
 
-        if os.path.isdir(args.path):
+        if os.path.isdir(args.path_in):
             # files = glob_files(args.path, file_type='*')
-            files = glob_files(args.path, file_type='*.jpg')
+            files = glob_files(args.path_in, file_type='*.jpg')
 
             for file in files:
                 txt_file = os.path.basename(file)[:-3] + 'txt'
@@ -752,14 +831,28 @@ if __name__ == '__main__':
                     print('does not have a label file:', txt_file)
                     dest = os.path.join(args.path_out, os.path.basename(file))
                     shutil.move(file, dest)
-        else:
-            if os.path.isdir(args.path):
-                files = glob_files(args.path, file_type='*')
 
-                for file in files:
-                    convert_labels(file, args.format_in, args.format_out)
-            else:
-                convert_labels(args.path, args.format_in, args.format_out)
     elif args.mode == Mode.FILTER:
-        print(args.mode)
-        filter_files(args.path, args.format_in, args.format_out)
+        filter_files(args.path_in, args.format_in, args.format_out)
+
+    elif args.mode == Mode.CONVERT:
+
+        if os.path.isdir(args.path_in):
+            files = []
+            folders = glob_folders(args.path_in, file_type='*')
+            if folders:
+                for folder in folders:
+                    files.extend(glob_files(folder, file_type='*.xml'))
+            # print(files)
+            else:
+                files = glob_files(args.path_in, file_type='*.xml')
+
+            print(files)
+
+            for file in files:
+                convert_labels(file, args.format_in, args.format_out)
+        else:
+            convert_labels(args.path_in, args.format_in, args.format_out)
+
+    else:
+        print("Please specify the mode")
