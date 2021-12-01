@@ -217,9 +217,16 @@ class CVATXmlParser(Parser):
                 # box = label, xtl, ytl, xbr, ybr, occluded, z_order, daynight, visibility
                 box = label, xtl, ytl, xbr, ybr, occluded, z_order
 
-                # only add what we care right now
-                if label in SW_EX1:
-                    boxes.append(box)
+                # # only add what we care right now
+                # if label in SW_EX1:
+                #     boxes.append(box)
+                if label in SW_IGNORE:
+                    continue
+
+                if label == "cat" or label == "dog":
+                    print("No cat", filename, boxes)
+                    exit(0)
+                boxes.append(box)
 
             image_labels.append([name, width, height, project_name, task_name, np.array(boxes)])
 
@@ -362,7 +369,7 @@ SIDEWALK_CLASSES = [
     "chair", "cat", "carrier", "car", "bus",
     "bollard", "bicycle", "bench", "barricade"]
 
-SW_EX1 = ["truck", "person", "car", "bus"]
+SW_EX1 = ["bus", "truck", "person", "car"]
 
 # 11
 SW_EXCLUDE = [
@@ -376,7 +383,7 @@ SW_EXCLUDE = [
 SW_IGNORE = [
         "barricade",
         "carrier",
-        "cat"
+        "cat",
         "dog",
         "fire_hydrant",
         "kiosk",
@@ -519,7 +526,7 @@ class CVATXmlConverter(Converter):
         with open("test.xml", "wb") as xml:
             xml.write(ET.tostring(tree_out, pretty_print=True))
 
-    def write(self, project_name, parsed, path_out):
+    def write_xml(self, project_name, parsed, path_out):
         tree_out = ET.parse(".\\data\\labels\\cvat_sidewalk.xml")
 
         datetime_now = datetime.datetime.now()
@@ -683,7 +690,65 @@ def count_labels(image_infos):
             else:
                 label_counts[label] = 1
 
+    label_counts = dict(sorted(label_counts.items(), key=lambda x: x[1], reverse=True))
+    for id, item in enumerate(label_counts.items()):
+        print(f'{id}\t{item[0]}\t{item[1]}')
     return label_counts
+
+
+def combine_dicts(dict1, dict2):
+    dict3 = dict()
+
+    for key1, val1 in dict1.items():
+        dict3[key1] = val1
+        if key1 in dict2.keys():
+            dict3[key1] = val1 + dict2[key1]
+
+    # Add items not in dict2
+    for key2, val2 in dict2.items():
+        if key2 not in dict1.keys():
+            dict3[key2] = val2
+
+    return dict3
+
+
+def pick_files(filtered, picked_filenames, label_counts, label, count=100):
+    picked = []
+
+    for item in filtered:
+        if label in label_counts.keys() and label_counts[label] > count:
+            break
+
+        filename = item[0]
+        if filename in picked_filenames:
+            continue
+
+        picked.append(item)
+        cur_label_counts = count_labels([item])
+        label_counts = combine_dicts(label_counts, cur_label_counts)
+
+    return picked, label_counts
+
+
+def filter_uniform(parsed, to_pick_labels, count=100, is_in=True):
+    picked_filenames = set()
+    label_counts = {}
+
+    print('parsed labels: ', count_labels(parsed))
+    picked = []
+    for to_pick_label in to_pick_labels:
+        pick_from, _ = filter_by_labels(parsed, [to_pick_label], is_in)
+        if len(pick_from) > 0:
+            (picked_loc, label_counts) = pick_files(pick_from, picked_filenames, label_counts, to_pick_label, count)
+            print(to_pick_label, label_counts, len(picked_loc))
+
+            for a in picked_loc:
+                filename = a[0]
+                picked_filenames.add(filename)
+                picked.append(a)
+
+    print("Picked: ", label_counts, len(picked))
+    return picked, None
 
 
 def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
@@ -712,16 +777,20 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         parsed.extend(p)
 
     # filtered = parsed
-    labels_to_filter = SW_EX1
+    # labels_to_filter = SW_EX1
     # filtered, dupe_count = filter_by_labels(parsed, SW_EXCLUDE, is_in=False)
     # filtered, dupe_count = filter_by_labels(filtered, TOP15, is_in=False)
     # filtered, dupe_count = filter_by_labels(filtered, TOP10, is_in=False)
     # filtered, dupe_count = filter_by_labels(filtered, ["alert@Seatbelt"])
-    filtered, dupe_count = filter_by_labels(parsed, SW_EX1)
+    # filtered, dupe_count = filter_by_labels(parsed, SW_EX1)
+    # filtered, dupe_count = filter_uniform(parsed, SW_EX1, count=1000)
     # filtered, dupe_count = filter_by_visibility(filtered, ['1', '2'])
+    filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
+    # filtered = parsed
+    dupe_count = 0
     print(len(filtered), "dupe:", dupe_count)
     print(count_labels(filtered))
-    # exit(0)
+    exit(0)
 
     if to_format == LabelFormat.EDGE_IMPULSE:
         convertor = EdgeImpulseConverter()
@@ -732,9 +801,9 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     else:
         print('Unsupported output format {}'.format(to_format))
 
-    random.shuffle(filtered)
+    # random.shuffle(filtered)
 
-    folder_prefix = "sw4_train"
+    folder_prefix = "swa_train"
     # Write 100 by
     from_id = 0
     to_id = 100
@@ -749,7 +818,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
 
         project_name = "{}_{}".format(folder_prefix, folder_id)
         # convertor.write(project_name, chunk, path_out)
-        convertor.write(project_name, chunk, path_out)
+        convertor.write_xml(project_name, chunk, path_out)
 
         # move all data files
         print(f"#project_name: {project_name} {path_in}")
@@ -759,7 +828,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         to_id = from_id + 100
 
 
-def move_data_files(parent_folder, folder_to, chunk):
+def move_data_files(parent_folder, convertor, folder_to, chunk):
     moved_count = 0
 
     folder_to = os.path.join(parent_folder, folder_to)
@@ -787,6 +856,7 @@ def move_data_files(parent_folder, folder_to, chunk):
             print("ERROR: {} does not exist".format(image_file))
             exit(-1)
 
+        convertor.convert(txt_file, parser)
         if os.path.exists(txt_file):
             dest_txt = os.path.join(folder_to, os.path.basename(txt_file))
 
