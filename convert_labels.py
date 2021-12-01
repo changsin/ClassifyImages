@@ -223,9 +223,6 @@ class CVATXmlParser(Parser):
                 if label in SW_IGNORE:
                     continue
 
-                if label == "cat" or label == "dog":
-                    print("No cat", filename, boxes)
-                    exit(0)
                 boxes.append(box)
 
             image_labels.append([name, width, height, project_name, task_name, np.array(boxes)])
@@ -379,6 +376,20 @@ SW_EXCLUDE = [
     "chair",
     "bollard", "bicycle", "bench"]
 
+# SW_TOP15 = [
+#     "truck", "tree_trunk", "traffic_sign", "traffic_light", # "wheelchair",
+#     # "traffic_light_controller", "table", "stroller", "stop", "scooter",
+#     "potted_plant", "pole", "person",       # "power_controller", "parking_meter",
+#     "movable_signage", "motorcycle",        # "kiosk", "fire_hydrant", "dog",
+#     "chair", "car", "bus",                  # "cat", "carrier"
+#     "bollard", "bicycle", "bench",          #"barricade",
+#         ]
+SW_TOP15 = [
+            "bench", "chair", "bus", "bicycle", "motorcycle",
+            "potted_plant", # "movable_signage", "truck", "traffic_light", "traffic_sign",
+            # "bollard", "pole", "person", "tree_trunk", "car"
+        ]
+
 # 14
 SW_IGNORE = [
         "barricade",
@@ -526,7 +537,7 @@ class CVATXmlConverter(Converter):
         with open("test.xml", "wb") as xml:
             xml.write(ET.tostring(tree_out, pretty_print=True))
 
-    def write_xml(self, project_name, parsed, path_out):
+    def write(self, project_name, parsed, path_out):
         tree_out = ET.parse(".\\data\\labels\\cvat_sidewalk.xml")
 
         datetime_now = datetime.datetime.now()
@@ -617,7 +628,7 @@ def filter_by_labels(parsed, labels, is_in=True):
     def _is_dupe(image_info, flist):
         for f in flist:
             if f[0] == image_info[0]:
-                # print("Dupe found {}".format(f))
+                print("Dupe found {}".format(f))
                 return True
         return False
 
@@ -691,8 +702,6 @@ def count_labels(image_infos):
                 label_counts[label] = 1
 
     label_counts = dict(sorted(label_counts.items(), key=lambda x: x[1], reverse=True))
-    for id, item in enumerate(label_counts.items()):
-        print(f'{id}\t{item[0]}\t{item[1]}')
     return label_counts
 
 
@@ -730,7 +739,7 @@ def pick_files(filtered, picked_filenames, label_counts, label, count=100):
     return picked, label_counts
 
 
-def filter_uniform(parsed, to_pick_labels, count=100, is_in=True):
+def filter_under_sample(parsed, to_pick_labels, count=100, is_in=True):
     picked_filenames = set()
     label_counts = {}
 
@@ -740,7 +749,7 @@ def filter_uniform(parsed, to_pick_labels, count=100, is_in=True):
         pick_from, _ = filter_by_labels(parsed, [to_pick_label], is_in)
         if len(pick_from) > 0:
             (picked_loc, label_counts) = pick_files(pick_from, picked_filenames, label_counts, to_pick_label, count)
-            print(to_pick_label, label_counts, len(picked_loc))
+            # print(to_pick_label, label_counts, len(picked_loc))
 
             for a in picked_loc:
                 filename = a[0]
@@ -783,14 +792,16 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     # filtered, dupe_count = filter_by_labels(filtered, TOP10, is_in=False)
     # filtered, dupe_count = filter_by_labels(filtered, ["alert@Seatbelt"])
     # filtered, dupe_count = filter_by_labels(parsed, SW_EX1)
-    # filtered, dupe_count = filter_uniform(parsed, SW_EX1, count=1000)
     # filtered, dupe_count = filter_by_visibility(filtered, ['1', '2'])
+    # filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
     filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
+    filtered, dupe_count = filter_under_sample(parsed, SW_TOP15, count=1000)
     # filtered = parsed
     dupe_count = 0
     print(len(filtered), "dupe:", dupe_count)
-    print(count_labels(filtered))
-    exit(0)
+    for id, item in enumerate(count_labels(filtered).items()):
+        print(f'{id}\t{item[0]}\t{item[1]}')
+    # print(count_labels(filtered))
 
     if to_format == LabelFormat.EDGE_IMPULSE:
         convertor = EdgeImpulseConverter()
@@ -803,11 +814,11 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
 
     # random.shuffle(filtered)
 
-    folder_prefix = "swa_train"
+    folder_prefix = "sw15_train"
     # Write 100 by
     from_id = 0
     to_id = 100
-    for folder_id in range(10):
+    for folder_id in range(25):
         chunk = filtered[from_id:to_id]
         print("Chunk is ", len(chunk))
         print(sorted(count_labels(chunk).items()))
@@ -818,7 +829,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
 
         project_name = "{}_{}".format(folder_prefix, folder_id)
         # convertor.write(project_name, chunk, path_out)
-        convertor.write_xml(project_name, chunk, path_out)
+        convertor.write(project_name, chunk, path_out)
 
         # move all data files
         print(f"#project_name: {project_name} {path_in}")
@@ -828,7 +839,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         to_id = from_id + 100
 
 
-def move_data_files(parent_folder, convertor, folder_to, chunk):
+def move_data_files(parent_folder, folder_to, chunk):
     moved_count = 0
 
     folder_to = os.path.join(parent_folder, folder_to)
@@ -856,7 +867,6 @@ def move_data_files(parent_folder, convertor, folder_to, chunk):
             print("ERROR: {} does not exist".format(image_file))
             exit(-1)
 
-        convertor.convert(txt_file, parser)
         if os.path.exists(txt_file):
             dest_txt = os.path.join(folder_to, os.path.basename(txt_file))
 
