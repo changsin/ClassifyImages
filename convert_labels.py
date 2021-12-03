@@ -386,8 +386,8 @@ SW_EXCLUDE = [
 #         ]
 SW_TOP15 = [
             "bench", "chair", "bus", "bicycle", "motorcycle",
-            "potted_plant", # "movable_signage", "truck", "traffic_light", "traffic_sign",
-            # "bollard", "pole", "person", "tree_trunk", "car"
+            "potted_plant", "movable_signage", "truck", "traffic_light", "traffic_sign",
+            "bollard", "pole", "person", "tree_trunk", "car"
         ]
 
 # 14
@@ -739,16 +739,36 @@ def pick_files(filtered, picked_filenames, label_counts, label, count=100):
     return picked, label_counts
 
 
-def filter_under_sample(parsed, to_pick_labels, count=100, is_in=True):
+def get_min_key(label_counts):
+    min_val = 9999
+    min_key = None
+
+    for key, value in label_counts.items():
+        if min_val >= value:
+            min_val = value
+            min_key = key
+            # break immediately, if min_val is 0
+            # since this is the absolute minimum possible value
+            if min_val == 0:
+                break
+
+    return min_key
+
+
+def filter_balance(parsed, to_pick_labels, max_count=1000, is_in=True):
+
     picked_filenames = set()
     label_counts = {}
+    for label in SW_TOP15:
+        label_counts[label] = 0
 
     print('parsed labels: ', count_labels(parsed))
     picked = []
-    for to_pick_label in to_pick_labels:
+    while len(picked_filenames) < max_count:
+        to_pick_label = get_min_key(label_counts)
         pick_from, _ = filter_by_labels(parsed, [to_pick_label], is_in)
         if len(pick_from) > 0:
-            (picked_loc, label_counts) = pick_files(pick_from, picked_filenames, label_counts, to_pick_label, count)
+            (picked_loc, label_counts) = pick_files(pick_from, picked_filenames, label_counts, to_pick_label, max_count)
             # print(to_pick_label, label_counts, len(picked_loc))
 
             for a in picked_loc:
@@ -795,7 +815,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     # filtered, dupe_count = filter_by_visibility(filtered, ['1', '2'])
     # filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
     filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
-    filtered, dupe_count = filter_under_sample(parsed, SW_TOP15, count=1000)
+    filtered, dupe_count = filter_balance(parsed, SW_TOP15, max_count=2500)
     # filtered = parsed
     dupe_count = 0
     print(len(filtered), "dupe:", dupe_count)
@@ -812,7 +832,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     else:
         print('Unsupported output format {}'.format(to_format))
 
-    # random.shuffle(filtered)
+    random.shuffle(filtered)
 
     folder_prefix = "sw15_train"
     # Write 100 by
