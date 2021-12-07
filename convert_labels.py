@@ -166,8 +166,8 @@ class CVATXmlParser(Parser):
         # print("Labels are: ")
 
         # project_name = tree.xpath('meta/task/project')[0].text
-        # task_name = tree.xpath('meta/task/name')[0].text
-        task_name = os.path.basename(get_parent_folder(filename))
+        task_name = tree.xpath('meta/task/name')[0].text
+        # task_name = os.path.basename(get_parent_folder(filename))
         project_name = task_name
 
         # for el in tree.xpath('meta/task/labels/label'):
@@ -387,7 +387,7 @@ SW_EXCLUDE = [
 SW_TOP15 = [
             "bench", "chair", "bus", "bicycle", "motorcycle",
             "potted_plant", "movable_signage", "truck", "traffic_light", "traffic_sign",
-            "bollard", "pole", "person", "tree_trunk", "car"
+            # "bollard", "pole", "person", "tree_trunk", "car"
         ]
 
 # 14
@@ -756,6 +756,29 @@ def get_min_key(label_counts):
 
 
 def filter_balance(parsed, to_pick_labels, max_count=1000, is_in=True):
+    picked_filenames = set()
+    label_counts = {}
+    for label in SW_TOP15:
+        label_counts[label] = 0
+
+    print('parsed labels: ', count_labels(parsed))
+    picked = []
+    for to_pick_label in to_pick_labels:
+        pick_from, _ = filter_by_labels(parsed, [to_pick_label], is_in)
+        if len(pick_from) > 0:
+            (picked_loc, label_counts) = pick_files(pick_from, picked_filenames, label_counts, to_pick_label, max_count)
+            # print(to_pick_label, label_counts, len(picked_loc))
+
+            for a in picked_loc:
+                filename = a[0]
+                picked_filenames.add(filename)
+                picked.append(a)
+
+    print("Picked: ", label_counts, len(picked))
+    return picked, None
+
+
+def filter_balance1(parsed, to_pick_labels, max_count=1000, is_in=True):
 
     picked_filenames = set()
     label_counts = {}
@@ -781,14 +804,12 @@ def filter_balance(parsed, to_pick_labels, max_count=1000, is_in=True):
 
 
 def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
-    cvat_files = []
-    folders = glob_folders(args.path_in, file_type='*')
-    if folders:
+    cvat_files = glob_files(args.path_in, file_type='*.xml')
+    if cvat_files is None or len(cvat_files) == 0:
+        folders = glob_folders(args.path_in, file_type='*')
         for folder in folders:
             cvat_files.extend(glob_files(folder, file_type='*.xml'))
-    # print(files)
-    else:
-        cvat_files = glob_files(args.path_in, file_type='*.xml')
+    print(cvat_files)
 
     parser = None
     convertor = None
@@ -815,13 +836,15 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     # filtered, dupe_count = filter_by_visibility(filtered, ['1', '2'])
     # filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
     filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
-    filtered, dupe_count = filter_balance(parsed, SW_TOP15, max_count=2500)
+    # filtered, dupe_count = filter_balance(parsed, SW_TOP15, max_count=1000)
+    # filtered, dupe_count = filter_balance(parsed, SW_TOP15, max_count=500)
     # filtered = parsed
     dupe_count = 0
     print(len(filtered), "dupe:", dupe_count)
     for id, item in enumerate(count_labels(filtered).items()):
         print(f'{id}\t{item[0]}\t{item[1]}')
-    # print(count_labels(filtered))
+    print(count_labels(filtered))
+    exit(0)
 
     if to_format == LabelFormat.EDGE_IMPULSE:
         convertor = EdgeImpulseConverter()
@@ -832,16 +855,28 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     else:
         print('Unsupported output format {}'.format(to_format))
 
-    random.shuffle(filtered)
+    for _ in range(100):
+        random.shuffle(filtered)
 
-    folder_prefix = "sw15_train"
+    folder_prefix = "train_over2"
     # Write 100 by
     from_id = 0
+    # to_id = 500
+    #
+    # folder_id = 20
+    # while folder_id < 25:
+    # for folder_id in range(25):
     to_id = 100
-    for folder_id in range(25):
+
+    folder_id = 0
+    while folder_id < 27:
         chunk = filtered[from_id:to_id]
         print("Chunk is ", len(chunk))
-        print(sorted(count_labels(chunk).items()))
+        label_counts = count_labels(chunk)
+        id = 0
+        for key, val in label_counts.items():
+            print("\t", id, key, val)
+            id += 1
 
         # path_out = os.path.join(os.path.dirname(path_in),
         path_out=os.path.join(path_in,
@@ -851,12 +886,14 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         # convertor.write(project_name, chunk, path_out)
         convertor.write(project_name, chunk, path_out)
 
-        # move all data files
-        print(f"#project_name: {project_name} {path_in}")
+        # # move all data files
+        # print(f"#project_name: {project_name} {path_in}")
         move_data_files(path_in, project_name, chunk)
 
         from_id = to_id + 1
         to_id = from_id + 100
+
+        folder_id += 1
 
 
 def move_data_files(parent_folder, folder_to, chunk):
