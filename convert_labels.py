@@ -1,233 +1,31 @@
 import argparse
 import datetime
-import glob
 import json
 import os
 import shutil
 from abc import ABC, abstractmethod
-from enum import Enum
 
-import numpy as np
 import random
 
-
 from lxml import etree as ET
+
+# SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+#
+# print('####', os.path.dirname(SCRIPT_DIR))
+# sys.path.append(SCRIPT_DIR)
+#
+# from pathlib import Path # if you haven't already done so
+# file = Path(__file__).resolve()
+# parent, root = file.parent, file.parents[1]
+# sys.path.append(str(root))
+#
+from src.constants import Mode, SIDEWALK_CLASSES, SW_TOP15, SW_IGNORE, LabelFormat
+from src.parser import KaggleXmlParser, CVATXmlParser
+from src.utils import glob_files, glob_folders
 
 """
 convert label files into different formats
 """
-
-IMAGE_SIZE = 320
-
-
-class Mode(Enum):
-    CONVERT = 'convert'
-    FILTER = 'filter'
-    REMOVE_UNLABELED_FILES = 'remove_unlabeled_files'
-
-    def __str__(self):
-        return self.value
-
-    def __repr__(self):
-        return str(self)
-
-    @staticmethod
-    def argparse(s):
-        try:
-            return Mode[s.upper()]
-        except KeyError:
-            return s
-
-
-class LabelFormat(Enum):
-    CVAT_XML        = 'cvat_xml'
-    KAGGLE_XML      = 'kaggle_xml'
-    EDGE_IMPULSE    = 'edge_impulse'
-    YOLOV5          = 'yolov5'
-
-    def __str__(self):
-        return self.value
-
-    def __repr__(self):
-        return str(self)
-
-    @staticmethod
-    def argparse(s):
-        try:
-            return LabelFormat[s.upper()]
-        except KeyError:
-            return s
-
-
-def glob_files(folder, file_type='*'):
-    search_string = os.path.join(folder, file_type)
-    files = glob.glob(search_string)
-
-    print('Searching ', search_string)
-    paths = []
-    for f in files:
-      if os.path.isdir(f):
-        sub_paths = glob_files(f + '/')
-        paths += sub_paths
-      else:
-        paths.append(f)
-
-    # We sort the images in alphabetical order to match them
-    #  to the annotation files
-    paths.sort()
-
-    return paths
-
-
-def glob_folders(folder, file_type='*'):
-    search_string = os.path.join(folder, file_type)
-    files = glob.glob(search_string)
-
-    print('Searching ', search_string)
-    paths = []
-    for f in files:
-      if os.path.isdir(f):
-        paths.append(f)
-
-    # We sort the images in alphabetical order to match them
-    #  to the annotation files
-    paths.sort()
-
-    return paths
-
-
-def to_file(path, data):
-    """
-    save data to path
-    """
-    with open(path,  'w', encoding="utf-8") as json_file:
-        json_file.write(data)
-
-
-def from_file(path):
-    """
-    save json data to path
-    """
-    file = open(path, 'r', encoding='utf-8')
-    return json.load(file)
-
-
-def get_parent_folder(path):
-    return path[:path[:-2].rfind('\\'):]
-
-
-class Parser(ABC):
-    def __init__(self):
-        self.labels = []
-
-    @abstractmethod
-    def parse(self, path, file_type='*'):
-        pass
-
-
-class KaggleXmlParser(Parser):
-    def parse(self, folder, file_type='*'):
-        def _parse_file(filename):
-            width, height = 0, 0
-            xmin, ymin, xmax, ymax = 0, 0, 0, 0
-
-            tree = ET.parse(filename)
-            for dim in tree.xpath("size"):
-                width = int(dim.xpath("width")[0].text)
-                height = int(dim.xpath("height")[0].text)
-
-            for dim in tree.xpath("object/bndbox"):
-                xmin = int(dim.xpath("xmin")[0].text)
-                ymin = int(dim.xpath("ymin")[0].text)
-                xmax = int(dim.xpath("xmax")[0].text)
-                ymax = int(dim.xpath("ymax")[0].text)
-
-            return [width, height,
-                    [["license", xmin, ymin, xmax, ymax]]]
-
-        files = glob_files(folder, file_type=file_type)
-
-        image_labels = []
-
-        for file in files:
-            width, height, image_label = _parse_file(file)
-            basename = os.path.basename(file).replace('.xml', '.png')
-
-            image_labels.append([basename, width, height, np.array(image_label)])
-
-        return np.array(image_labels)
-
-
-class CVATXmlParser(Parser):
-    def parse(self, filename, file_type='*'):
-        image_labels = []
-
-        tree = ET.parse(filename)
-        # print("Labels are: ")
-
-        # project_name = tree.xpath('meta/task/project')[0].text
-        task_name = tree.xpath('meta/task/name')[0].text
-        # task_name = os.path.basename(get_parent_folder(filename))
-        project_name = task_name
-
-        # for el in tree.xpath('meta/task/labels/label'):
-        #     label = el.xpath('name')[0].text
-        #
-        #     # # for now, this is for dashboard labels only
-        #     for sub_el in el.xpath('attributes/attribute'):
-        #         if sub_el.xpath('name')[0].text == 'name':
-        #             values = sub_el.xpath('values')[0].text.split()
-        #
-        #             for value in values:
-        #                 value = value.strip()
-        #                 self.labels.append("{}@{}".format(label, value))
-        #     #
-        #     #     print("\"{}\", ".format(at[0].text), end="")
-        #     #     self.labels.append(at)
-        #
-        # self.labels.sort()
-
-        for image in tree.xpath('image'):
-            # print(image.attrib['name'])
-            name = image.attrib['name']
-            width = int(image.attrib['width'])
-            height = int(image.attrib['height'])
-
-            boxes = []
-
-            for box in image.xpath('box'):
-                xtl = float(box.attrib['xtl'])
-                ytl = float(box.attrib['ytl'])
-                xbr = float(box.attrib['xbr'])
-                ybr = float(box.attrib['ybr'])
-
-                occluded = int(box.attrib['occluded'])
-                z_order = int(box.attrib['z_order'])
-
-                label = box.attrib['label']
-                # wtype = box.xpath('attribute[@name="name"]')[0].text
-                # daynight = box.xpath('attribute[@name="daynight"]')[0].text
-                # visibility = int(box.xpath('attribute[@name="visibility"]')[0].text)
-                # if box.xpath('attribute[@name="name"]'):
-                #     label = "{}@{}".format(label, box.xpath('attribute[@name="name"]')[0].text)
-
-                # add other attributes too
-                # daynight = box.xpath('attribute[@name="daynight"]')[0].text
-                # visibility = box.xpath('attribute[@name="visibility"]')[0].text
-                # box = label, xtl, ytl, xbr, ybr, occluded, z_order, daynight, visibility
-                box = label, xtl, ytl, xbr, ybr, occluded, z_order
-
-                # # only add what we care right now
-                # if label in SW_EX1:
-                #     boxes.append(box)
-                if label in SW_IGNORE:
-                    continue
-
-                boxes.append(box)
-
-            image_labels.append([name, width, height, project_name, task_name, np.array(boxes)])
-
-        return np.array(image_labels, dtype=object)
 
 
 def default(obj):
@@ -301,112 +99,6 @@ class Converter(ABC):
     @abstractmethod
     def convert(self, path, parser):
         pass
-
-
-DASHBOARD_CLASSES = [
-                    "alert@Alternator", "alert@Brake", "alert@Coolant",
-                    "alert@Distance", "alert@EngineOil", "alert@EngineOilTemp",
-                    "alert@Parking", "alert@Retaining", "alert@Seatbelt",
-                    "alert@Steering",
-
-                    "warning@ABS", "warning@Brake", "warning@BrakeWear",
-                    "warning@CentralMonitoring", "warning@EPC", "warning@Engine",
-                    "warning@Fuel", "warning@Glow", "warning@Headlamp",
-                    "warning@Lamp", "warning@Parking", "warning@Retaining",
-                    "warning@StabilityOff", "warning@StabilityOn", "warning@Steering",
-                    "warning@TPMS", "warning@Tire", "warning@Washer"]
-
-DB_EXCLUDE = [
-    # "alert@Retaining",
-    # "alert@Distance",
-    # "warning@ABS",
-    # "alert@Coolant",
-    # "warning@Fuel",
-    "warning@Retaining",
-    "warning@Steering",
-    "alert@EngineOilTemp",
-    "warning@Glow",
-    "warning@CentralMonitoring",
-    "warning@EPC",
-    "warning@Washer"
-]
-
-DB_TOPS = [
-    # Top 5
-    "alert@Seatbelt",
-    "warning@Engine",
-    "alert@Parking",
-    "warning@Tire",
-    "warning@StabilityOn",
-
-    # Top 10
-    "alert@Brake",
-    "warning@StabilityOff",
-    "warning@Brake",
-    "alert@Steering",
-    "warning@Parking",
-
-    # Top 15
-    "alert@Retaining",
-    "alert@Distance",
-    "warning@ABS",
-    "alert@Coolant",
-    "warning@Fuel"
-]
-
-DB_TOP5 = DB_TOPS[:5]
-DB_TOP10 = DB_TOPS[5:10]
-DB_TOP15 = DB_TOPS[10:15]
-
-SIDEWALK_CLASSES = [
-    "wheelchair", "truck", "tree_trunk", "traffic_sign", "traffic_light",
-    "traffic_light_controller", "table", "stroller", "stop", "scooter",
-    "potted_plant", "power_controller", "pole", "person", "parking_meter",
-    "movable_signage", "motorcycle", "kiosk", "fire_hydrant", "dog",
-    "chair", "cat", "carrier", "car", "bus",
-    "bollard", "bicycle", "bench", "barricade"]
-
-SW_EX1 = ["bus", "truck", "person", "car"]
-
-# 11
-SW_EXCLUDE = [
-    "tree_trunk", "traffic_sign", "traffic_light",
-    "potted_plant", "pole",
-    "movable_signage", "motorcycle",
-    "chair",
-    "bollard", "bicycle", "bench"]
-
-# SW_TOP15 = [
-#     "truck", "tree_trunk", "traffic_sign", "traffic_light", # "wheelchair",
-#     # "traffic_light_controller", "table", "stroller", "stop", "scooter",
-#     "potted_plant", "pole", "person",       # "power_controller", "parking_meter",
-#     "movable_signage", "motorcycle",        # "kiosk", "fire_hydrant", "dog",
-#     "chair", "car", "bus",                  # "cat", "carrier"
-#     "bollard", "bicycle", "bench",          #"barricade",
-#         ]
-SW_TOP15 = [
-            "bench", "chair", "bus", "bicycle", "motorcycle",
-            "potted_plant", "movable_signage", "truck", "traffic_light", "traffic_sign",
-            # "bollard", "pole", "person", "tree_trunk", "car"
-        ]
-
-# 14
-SW_IGNORE = [
-        "barricade",
-        "carrier",
-        "cat",
-        "dog",
-        "fire_hydrant",
-        "kiosk",
-        "parking_meter",
-        "power_controller",
-        "table",
-        "traffic_light_controller",
-        "scooter",
-        "stop",
-        "stroller",
-        "wheelchair",
-    ]
 
 
 class YoloV5Converter(Converter):
@@ -836,7 +528,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     # filtered, dupe_count = filter_by_visibility(filtered, ['1', '2'])
     # filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
     filtered, dupe_count = filter_by_labels(parsed, SW_IGNORE, is_in=False)
-    # filtered, dupe_count = filter_balance(parsed, SW_TOP15, max_count=1000)
+    filtered, dupe_count = filter_balance(parsed, SW_TOP15, max_count=1000)
     # filtered, dupe_count = filter_balance(parsed, SW_TOP15, max_count=500)
     # filtered = parsed
     dupe_count = 0
@@ -858,7 +550,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     for _ in range(100):
         random.shuffle(filtered)
 
-    folder_prefix = "train_over2"
+    folder_prefix = "train_over_1k"
     # Write 100 by
     from_id = 0
     # to_id = 500
@@ -869,7 +561,7 @@ def filter_files(path_in, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     to_id = 100
 
     folder_id = 0
-    while folder_id < 27:
+    while folder_id < 10:
         chunk = filtered[from_id:to_id]
         print("Chunk is ", len(chunk))
         label_counts = count_labels(chunk)
