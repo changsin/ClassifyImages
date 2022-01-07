@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from lxml import etree as ET
 
+import src.utils
 from src.constants import SW_IGNORE
 from src.utils import glob_files, get_parent_folder
 
@@ -121,5 +122,54 @@ class CVATXmlParser(Parser):
                 boxes.append(box)
 
             image_labels.append([name, width, height, project_name, task_name, np.array(boxes)])
+
+        return np.array(image_labels, dtype=object)
+
+
+class CoCoJsonParser(Parser):
+    def parse(self, filename, file_type='*'):
+        data = src.utils.from_file(filename)
+
+        task_name = os.path.basename(get_parent_folder(filename))
+        project_name = task_name
+
+        annotations = data['annotations']
+
+        labels_dict = {}
+        for label in data['categories']:
+            labels_dict[label['id']] = label['name']
+            self.labels.append(label['name'])
+            print("\"{}\",".format(label['name']))
+
+        boxes_dict = {}
+        for annotation in annotations:
+            image_id = annotation['image_id']
+            bbox = annotation['bbox']
+            category_id = annotation['category_id']
+
+            boxes = []
+            if image_id in boxes_dict.keys():
+                boxes = boxes_dict.get(image_id)
+
+            label_name = labels_dict[category_id]
+
+            xbr = bbox[0] + bbox[2]
+            ybr = bbox[1] + bbox[3]
+
+            boxes.append([label_name, bbox[0], bbox[1], xbr, ybr])
+            boxes_dict[image_id] = boxes
+
+        image_labels = []
+        for image in data['images']:
+            image_id = image['id']
+            image_name = image['file_name']
+            width = image['width']
+            height = image['height']
+
+            boxes = []
+            if image_id in boxes_dict.keys():
+                boxes = boxes_dict.get(image_id)
+
+            image_labels.append([image_name, width, height, project_name, task_name, np.array(boxes)])
 
         return np.array(image_labels, dtype=object)

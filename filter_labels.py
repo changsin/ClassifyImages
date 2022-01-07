@@ -3,7 +3,7 @@ import os
 import random
 import shutil
 
-from convert_labels import EdgeImpulseConverter, YoloV5Converter, CVATXmlConverter
+from src.converter import YoloV5Converter, EdgeImpulseConverter, CVATXmlConverter
 from src.constants import Mode
 from src.constants import SW_TOP15, LabelFormat, SW_IGNORE
 from src.parser import CVATXmlParser, KaggleXmlParser
