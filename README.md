@@ -23,3 +23,19 @@ Example:
 python .\convert_labels.py -mode convert -path .\SkNetworks_CarDashboard_21036\01.rawData\2\BMW\BMW_day_0_1.xml -for
 mat_in cvat_xml
 ```
+
+# Formats
+
+## COCO JSON
+The format of COCO JSON is [here](https://cocodataset.org/#format-data)
+The bounding box format for object detection is 
+
+```
+annotation{
+"id": int, "image_id": int, "category_id": int, "segmentation": RLE or [polygon], "area": float, "bbox": [x,y,width,height], "iscrowd": 0 or 1,
+}
+
+categories[{
+"id": int, "name": str, "supercategory": str,
+}]
+```
