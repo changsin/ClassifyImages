@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -308,6 +309,7 @@ class CoCoConverter(Converter):
         matching_id = None
         for el in self.categories:
             id1, name1 = el['id'], el['name']
+            # TODO: this is a hacky way of finding the id from the category name but works for this project
             if name[:3] == name1[:3]:
                 matching_id = id1
                 break
@@ -315,6 +317,16 @@ class CoCoConverter(Converter):
         assert (matching_id is not None)
 
         return matching_id
+
+    @staticmethod
+    def _parse_date_from_file_name(file_name):
+        # V3F_HY_8484_20201208_130036_E_CH1_Seoul_Sun_Mainroad_Day_50936.png
+        # date is 20201208
+        matched = re.search('^[a-z0-9]*_[a-z0-9]*_[0-9]*_[0-9]*', file_name, re.IGNORECASE).group(0)
+        tokens = matched.split('_')
+        year_date = tokens[3]
+        year, month, day = year_date[:4], year_date[4:6], year_date[-2:]
+        return year, month, day
 
     def convert(self, path, parser):
         parsed = parser.parse(path)
@@ -326,11 +338,10 @@ class CoCoConverter(Converter):
             info["description"] = img[3]
             info["url"] = ""
             info["version"] = "1.0"
-            # TODO: Parse from the file name for the correct year
-            info["year"] = datetime.date.today().year
+            year, month, day = CoCoConverter._parse_date_from_file_name(img[0])
+            info["year"] = int(year)
             info["contributor"] = "Konkuk_university"  # hard-code it for this dataset
-            # TODO: Parse from the file name for the correct year
-            info["date_created"] = str(datetime.date.today()).replace('-', '/')
+            info["date_created"] = "{}/{}/{}".format(year, month, day)
             json_labels["info"] = info
 
             images = dict()
