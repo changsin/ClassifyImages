@@ -2,9 +2,11 @@ import datetime
 import json
 import os
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 from lxml import etree as ET
 
+import src.utils
 from src.constants import SIDEWALK_CLASSES
 
 
@@ -96,9 +98,9 @@ class YoloV5Converter(Converter):
                 width = float(a[3]) - float(a[1])
                 height = float(a[4]) - float(a[2])
                 image_label = ImageLabel(a[0],
-                                         (float(a[1]) + width/2)/res_w,
-                                         (float(a[2]) + height/2)/res_h,
-                                         width/res_w, height/res_h)
+                                         (float(a[1]) + width / 2) / res_w,
+                                         (float(a[2]) + height / 2) / res_h,
+                                         width / res_w, height / res_h)
                 labels.append(image_label)
 
             sub_folder = os.path.join(os.path.dirname(path), os.path.basename(path)[:-4])
@@ -287,8 +289,89 @@ class CVATXmlConverter(Converter):
 
 
 class CoCoConverter(Converter):
+    def __init__(self):
+        self.categories = [
+            # TODO: hard-coding it for this dataset
+            {"id": 1, "name": "Animals(Dolls)"},
+            {"id": 2, "name": "Person"},
+            {"id": 3, "name": "Garbage bag & sacks"},
+            {"id": 4, "name": "Construction signs & Parking prohibited board"},
+            {"id": 5, "name": "Traffic cone"},
+            {"id": 6, "name": "Box"},
+            {"id": 7, "name": "Stones on road"},
+            {"id": 8, "name": "Pothole on road"},
+            {"id": 9, "name": "Filled pothole"},
+            {"id": 10, "name": "Manhole"}
+        ]
+
+    def _find_category_id(self, name):
+        matching_id = None
+        for el in self.categories:
+            id1, name1 = el['id'], el['name']
+            if name[:3] == name1[:3]:
+                matching_id = id1
+                break
+
+        assert (matching_id is not None)
+
+        return matching_id
+
     def convert(self, path, parser):
         parsed = parser.parse(path)
+
+        for img in parsed:
+            json_labels = {}
+
+            info = dict()
+            info["description"] = img[3]
+            info["url"] = ""
+            info["version"] = "1.0"
+            # TODO: Parse from the file name for the correct year
+            info["year"] = datetime.date.today().year
+            info["contributor"] = "Konkuk_university"  # hard-code it for this dataset
+            # TODO: Parse from the file name for the correct year
+            info["date_created"] = str(datetime.date.today()).replace('-', '/')
+            json_labels["info"] = info
+
+            images = dict()
+            images["file_name"] = img[0]
+            images["width"] = img[1]
+            images["height"] = img[2]
+            images["id"] = 1
+            json_labels["images"] = images
+
+            annotations = []
+            for idx, ann in enumerate(img[5]):
+                annotation = dict()
+                annotation["segmentation"] = []
+                annotation["polyline"] = []
+                annotation["image_id"] = 1
+
+                label, xtl, ytl, xbr, ybr, _, _ = ann
+                width = float(xbr) - float(xtl)
+                height = float(ybr) - float(ytl)
+                annotation["bbox"] = [
+                    float(xtl),
+                    float(ytl),
+                    width,
+                    height
+                ]
+                annotation["category_id"] = self._find_category_id(label)
+                annotation["area"] = width * height
+                annotation["is_crowd"] = 0  # hard-coding it for now
+                annotation["id"] = idx + 1
+
+                annotations.append(annotation)
+
+            json_labels["annotations"] = annotations
+
+            json_labels["categories"] = self.categories
+
+            out_path = os.path.join(Path(path).parent, Path(img[0]).stem + ".json")
+            print("Writing to {}".format(out_path))
+
+            # Set ensure_ascii=False to write hangul and other unicode chars correctly
+            src.utils.to_file(out_path, json.dumps(json_labels, ensure_ascii=False))
 
 
 def default(obj):

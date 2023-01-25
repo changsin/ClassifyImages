@@ -3,7 +3,7 @@ import os
 import shutil
 
 from src.constants import Mode, LabelFormat
-from src.converter import YoloV5Converter, EdgeImpulseConverter, CVATXmlConverter
+from src.converter import YoloV5Converter, EdgeImpulseConverter, CVATXmlConverter, CoCoConverter
 from src.parser import CoCoJsonParser, CVATXmlParser, KaggleXmlParser
 from src.utils import glob_files, glob_folders
 
@@ -31,6 +31,8 @@ def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
         convertor = YoloV5Converter()
     elif to_format == LabelFormat.CVAT_XML:
         convertor = CVATXmlConverter()
+    elif to_format == LabelFormat.COCO_JSON:
+        convertor = CoCoConverter()
     else:
         print('Unsupported output format {}'.format(to_format))
 

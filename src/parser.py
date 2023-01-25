@@ -60,28 +60,32 @@ class CVATXmlParser(Parser):
 
         task_name = os.path.basename(get_parent_folder(filename))
         project_name = task_name
+        labels = []
         # if the project file is in
         if tree.xpath('meta/task/name'):
             task_name = tree.xpath('meta/task/name')[0].text
         if tree.xpath('meta/task/project'):
             project_name = tree.xpath('meta/task/project')[0].text
+        # if tree.xpath('meta/task/labels'):
+        #     for label in tree.xpath('meta/task/labels'):
+        #         print(label)
 
-        # for el in tree.xpath('meta/task/labels/label'):
-        #     label = el.xpath('name')[0].text
-        #
-        #     # # for now, this is for dashboard labels only
-        #     for sub_el in el.xpath('attributes/attribute'):
-        #         if sub_el.xpath('name')[0].text == 'name':
-        #             values = sub_el.xpath('values')[0].text.split()
-        #
-        #             for value in values:
-        #                 value = value.strip()
-        #                 self.labels.append("{}@{}".format(label, value))
-        #     #
-        #     #     print("\"{}\", ".format(at[0].text), end="")
-        #     #     self.labels.append(at)
-        #
-        # self.labels.sort()
+        for el in tree.xpath('meta/task/labels/label'):
+            label = el.xpath('name')[0].text
+
+            # # # for now, this is for dashboard labels only
+            # for sub_el in el.xpath('attributes/attribute'):
+            #     if sub_el.xpath('name')[0].text == 'name':
+            #         values = sub_el.xpath('values')[0].text.split()
+            #
+            #         for value in values:
+            #             value = value.strip()
+            #             self.labels.append("{}@{}".format(label, value))
+            #
+            #     print("\"{}\", ".format(at[0].text), end="")
+            self.labels.append(label)
+
+        self.labels.sort()
 
         for image in tree.xpath('image'):
             # print(image.attrib['name'])
