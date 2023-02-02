@@ -39,6 +39,12 @@ def convert_labels(path, from_format, to_format=LabelFormat.EDGE_IMPULSE):
     convertor.convert(path, parser)
 
 
+def convert_xmls(path_in, path_out):
+    parser = CVATXmlParser()
+
+    parser.convert_xml(path_in, path_out)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", action="store", type=Mode.argparse, choices=list(Mode), dest="mode")
@@ -67,6 +73,25 @@ if __name__ == '__main__':
                     print('does not have a label file:', txt_file)
                     dest = os.path.join(args.path_out, os.path.basename(file))
                     shutil.move(file, dest)
+
+    elif args.mode == Mode.CONVERT_XML:
+
+        if os.path.isdir(args.path_in):
+            files = []
+            folders = glob_folders(args.path_in, file_type='*')
+            if folders:
+                for folder in folders:
+                    files.extend(glob_files(folder, file_type='*.xml'))
+            # print(files)
+            else:
+                files = glob_files(args.path_in, file_type='*.xml')
+
+            print(files)
+
+            for file in files:
+                convert_xmls(args.path_in, args.path_out)
+        else:
+            convert_xmls(args.path_in, args.path_out)
 
     elif args.mode == Mode.CONVERT:
 

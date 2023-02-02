@@ -5,6 +5,7 @@ IMAGE_SIZE = 320
 
 class Mode(Enum):
     CONVERT = 'convert'
+    CONVERT_XML = 'convert_xml'
     FILTER = 'filter'
     REMOVE_UNLABELED_FILES = 'remove_unlabeled_files'
 

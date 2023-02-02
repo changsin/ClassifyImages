@@ -7,6 +7,7 @@ from lxml import etree as ET
 import src.utils
 from src.constants import SW_IGNORE
 from src.utils import glob_files, get_parent_folder
+from pathlib import Path
 
 
 class Parser(ABC):
@@ -52,6 +53,66 @@ class KaggleXmlParser(Parser):
 
 
 class CVATXmlParser(Parser):
+    def convert_xml(self, path_in, path_out):
+        image_labels = []
+
+        tree_out = ET.parse(path_in)
+        # print("Labels are: ")
+
+        el_root = tree_out.getroot()
+
+        for image in el_root.xpath('image'):
+            children = image.getchildren()
+
+            el_image = ET.SubElement(el_root, 'image')
+            el_image.set('name', image.attrib['name'])
+            el_image.set('id', image.attrib['id'])
+            el_image.set('width', image.attrib['width'])
+            el_image.set('height', image.attrib['height'])
+
+            for child in children:
+                el_new = ET.SubElement(el_image, 'polyline')
+                el_new.set('label', 'person')
+                el_new.set('occluded', child.attrib['occluded'])
+                # el_new.set('source', child.attrib['source'])
+                el_new.set('z_order', child.attrib['z_order'])
+
+                # el_new.set('points', child.attrib['points'])
+                # points_new = ""
+                # points = child.attrib['points']
+                # tokens = points.split(';')
+                # for token in tokens:
+                #     x, y, visible = token.split(',')
+                #     points_new += "{},{};".format(x, y)
+                # points_new = points_new.removesuffix(';')
+                # el_new.set('points', str(points_new))
+
+                tokens = child.attrib['points'].split(';')
+
+                idx_order = [0, 1, 2, 3, 4, 3, 5, 3, 2, 1, 0, 6, 7, 8, 9, 8, 10, 8, 7, 6, 0, 11, 12, 13, 14, 15, 16, 17, 16, 18, 16, 15, 14, 13, 19, 20, 21, 22, 21, 23, 21, 20, 19, 13, 24, 25, 24, 26]
+
+                points = []
+                for idx in idx_order:
+                    points.append(tokens[idx])
+
+                points_str = ""
+                for point in points:
+                    points_str += "{};".format(point)
+
+                # for token in tokens:
+                #     x, y, visible = token.split(',')
+                #     # points_new += "{},{},{};".format(x, y, visible)
+                points_str = points_str.removesuffix(';')
+                el_new.set('points', points_str)
+
+            el_root.remove(image)
+
+        file_name_out = os.path.join(Path(path_in).parent, Path(path_in).stem + ".poly25.xml")
+        print("Writing to {}".format(file_name_out))
+
+        with open(file_name_out, "wb") as xml:
+            xml.write(ET.tostring(tree_out, encoding="utf-8", pretty_print=True))
+
     def parse(self, filename, file_type='*'):
         image_labels = []
 
