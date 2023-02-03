@@ -1,6 +1,8 @@
 import glob
 import json
 import os
+import random
+import shutil
 
 
 def glob_files(folder, file_type='*'):
@@ -58,3 +60,71 @@ def from_file(path):
 
 def get_parent_folder(path):
     return path[:path[:-2].rfind('\\'):]
+
+
+def split_train_val_test_files(parent_folder, folder_from, folder_to, ratio=0.1):
+    def _copy_files(files_from, folder_to, start_id, end_id):
+        for id in range(start_id, end_id):
+            file_from = files_from[id]
+
+            sub_folder_parent = os.path.basename(os.path.dirname(file_from))
+            sub_folder_to = os.path.join(folder_to, os.path.basename(sub_folder_parent))
+            file_to = os.path.join(sub_folder_to, os.path.basename(file_from))
+            if not os.path.exists(sub_folder_to):
+                print("Creating folder to ", sub_folder_to)
+                os.mkdir(sub_folder_to)
+
+            if os.path.exists(file_to):
+                print("ERROR: target {} already exists".format(file_to))
+                print("Skipping")
+                continue
+                # exit(-1)
+
+            else:
+                print(file_from, file_to)
+                shutil.copy(file_from, file_to)
+
+    folder_to = os.path.join(parent_folder, folder_to)
+    folder_train = os.path.join(folder_to, "train")
+    folder_val = os.path.join(folder_to, "val")
+    folder_test = os.path.join(folder_to, "test")
+
+    if not os.path.exists(folder_to):
+        print("Creating folder to ", folder_to)
+        os.mkdir(folder_to)
+    if not os.path.exists(folder_train):
+        print("Creating folder to ", folder_train)
+        os.mkdir(folder_train)
+    if not os.path.exists(folder_val):
+        print("Creating folder to ", folder_val)
+        os.mkdir(folder_val)
+    if not os.path.exists(folder_test):
+        print("Creating folder to ", folder_test)
+        os.mkdir(folder_test)
+
+    sub_folders = glob_folders(folder_from)
+    copied_count = 0
+
+    for sub_id, sub_folder in enumerate(sub_folders):
+        files = glob_files(sub_folder)
+
+        random.shuffle(files)
+        end_id = len(files)
+        test_id = int(len(files) * 0.1)
+        print("Copying {} - {} files".format(0, test_id))
+        val_id = test_id * 2
+        print("Copying {} - {} files".format(test_id, val_id))
+
+        # sub_folder_to = os.path.join(folder_to, "{}_{}"
+        #                              .format(os.path.basename(folder_to), sub_id))
+        # if not os.path.exists(sub_folder_to):
+        #     print("Creating folder to ", sub_folder_to)
+        #     os.mkdir(sub_folder_to)
+        _copy_files(files, folder_test, 0, test_id)
+        _copy_files(files, folder_val, test_id, val_id)
+        _copy_files(files, folder_train, val_id, end_id)
+        copied_count += end_id
+
+        exit(0)
+
+    print("Copied ", copied_count)

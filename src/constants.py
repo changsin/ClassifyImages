@@ -4,6 +4,7 @@ IMAGE_SIZE = 320
 
 
 class Mode(Enum):
+    SPLIT = 'split'
     CONVERT = 'convert'
     CONVERT_XML = 'convert_xml'
     FILTER = 'filter'
@@ -74,6 +75,10 @@ DB_TOPS = [
 DB_TOP5 = DB_TOPS[:5]
 DB_TOP10 = DB_TOPS[5:10]
 DB_TOP15 = DB_TOPS[10:15]
+
+CHILD_ZONE = ["person", "vehicle", "cycle", "kick", "face", "license_plate", "umbrella", "traffic_light", "dog",
+              "motorbike"]
+
 SIDEWALK_CLASSES = [
     "wheelchair", "truck", "tree_trunk", "traffic_sign", "traffic_light",
     "traffic_light_controller", "table", "stroller", "stop", "scooter",

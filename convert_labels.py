@@ -5,7 +5,7 @@ import shutil
 from src.constants import Mode, LabelFormat
 from src.converter import YoloV5Converter, EdgeImpulseConverter, CVATXmlConverter, CoCoConverter
 from src.parser import CoCoJsonParser, CVATXmlParser, KaggleXmlParser
-from src.utils import glob_files, glob_folders
+from src.utils import glob_files, glob_folders, split_train_val_test_files
 
 """
 convert label files into different formats
@@ -111,6 +111,9 @@ if __name__ == '__main__':
                 convert_labels(file, args.format_in, args.format_out)
         else:
             convert_labels(args.path_in, args.format_in, args.format_out)
+
+    elif args.mode == Mode.SPLIT:
+        split_train_val_test_files(args.path_in, args.path_in, args.path_out, ratio=0.1)
 
     else:
         print("Please specify the mode")
