@@ -8,7 +8,7 @@ from pathlib import Path
 from lxml import etree as ET
 
 import src.utils
-from src.constants import SIDEWALK_CLASSES
+from src.constants import CHILD_ZONE
 
 
 class ImageLabel:
@@ -104,16 +104,28 @@ class YoloV5Converter(Converter):
                                          width / res_w, height / res_h)
                 labels.append(image_label)
 
-            sub_folder = os.path.join(os.path.dirname(path), os.path.basename(path)[:-4])
+            tokens = os.path.basename(path).split('_')
+            prefix = tokens[0]
+            suffix_tokens = tokens[6:-3]
+            suffix = ""
+            for t in suffix_tokens:
+                suffix += "{}{}".format(t, "_")
+
+            sub_folder1 = os.path.join(os.path.dirname(path), "{}_{}".format(prefix, suffix))
+            sub_folder1 = sub_folder1.removesuffix("_")
+
+            sub_folder2 = os.path.join(sub_folder1, os.path.basename(path)[:-4])
+            if not os.path.exists(sub_folder2):
+                os.makedirs(sub_folder2)
             # out_filename = os.path.join(sub_folder, image_filename[:-3] + 'txt')
-            out_filename = os.path.join(os.path.dirname(sub_folder), image_filename[:-3] + 'txt')
+            out_filename = os.path.join(sub_folder2, image_filename[:-3] + 'txt')
 
             # print(out_filename, labels)
             # print("Writing ", out_filename)
             with open(out_filename, "w+") as file_out:
                 for label in labels:
                     # class_id = parser.labels.index(label.label)
-                    class_id = SIDEWALK_CLASSES.index(label.label)
+                    class_id = CHILD_ZONE.index(label.label)
                     file_out.write("{} {} {} {} {}\n".format(class_id,
                                                              label.x, label.y, label.width, label.height))
         # [print(label) for label in enumerate(parser.labels)]
