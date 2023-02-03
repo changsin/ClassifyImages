@@ -3,7 +3,7 @@ import json
 import os
 import random
 import shutil
-
+from pathlib import Path
 
 def glob_files(folder, file_type='*'):
     search_string = os.path.join(folder, file_type)
@@ -128,3 +128,31 @@ def split_train_val_test_files(parent_folder, folder_from, folder_to, ratio=0.1)
         exit(0)
 
     print("Copied ", copied_count)
+
+
+def copy_label_files(folder_images, folder_labels):
+    copied_count = 0
+
+    labels_dict = dict()
+    label_sub_folders = glob_folders(folder_labels)
+    for label_sub_id, label_sub_folder in enumerate(label_sub_folders):
+        label_files = glob_files(label_sub_folder)
+
+        for label_file in label_files:
+            file_name = Path(os.path.basename(label_file)).stem
+            if labels_dict.get(file_name.lower()):
+                print("ERROR: Duplicate file names found!")
+            else:
+                labels_dict[file_name.lower()] = label_file
+
+    image_sub_folders = glob_folders(folder_images)
+    for img_sub_id, img_sub_folder in enumerate(image_sub_folders):
+        img_files = glob_files(img_sub_folder)
+
+        for img_file in img_files:
+            file_name = Path(os.path.basename(img_file)).stem
+            label_file_path = labels_dict[file_name.lower()]
+            print(label_file_path, img_sub_folder)
+            shutil.copy(label_file_path, os.path.dirname(img_file))
+            copied_count += 1
+    print("Copied {} files".format(copied_count))

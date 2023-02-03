@@ -5,6 +5,7 @@ IMAGE_SIZE = 320
 
 class Mode(Enum):
     SPLIT = 'split'
+    COPY_LABEL_FILES = 'copy_label_files'
     CONVERT = 'convert'
     CONVERT_XML = 'convert_xml'
     FILTER = 'filter'
