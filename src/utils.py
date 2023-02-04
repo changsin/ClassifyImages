@@ -115,17 +115,10 @@ def split_train_val_test_files(parent_folder, folder_from, folder_to, ratio=0.1)
         val_id = test_id * 2
         print("Copying {} - {} files".format(test_id, val_id))
 
-        # sub_folder_to = os.path.join(folder_to, "{}_{}"
-        #                              .format(os.path.basename(folder_to), sub_id))
-        # if not os.path.exists(sub_folder_to):
-        #     print("Creating folder to ", sub_folder_to)
-        #     os.mkdir(sub_folder_to)
         _copy_files(files, folder_test, 0, test_id)
         _copy_files(files, folder_val, test_id, val_id)
         _copy_files(files, folder_train, val_id, end_id)
         copied_count += end_id
-
-        exit(0)
 
     print("Copied ", copied_count)
 
