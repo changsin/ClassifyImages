@@ -148,4 +148,4 @@ def copy_label_files(folder_images, folder_labels):
             print(label_file_path, img_sub_folder)
             shutil.copy(label_file_path, os.path.dirname(img_file))
             copied_count += 1
-    print("Copied {} files".format(copied_count))
+    print("Copied {} label files".format(copied_count))
