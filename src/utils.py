@@ -149,3 +149,18 @@ def copy_label_files(folder_images, folder_labels):
             shutil.copy(label_file_path, os.path.dirname(img_file))
             copied_count += 1
     print("Copied {} label files".format(copied_count))
+
+# Copy and flatten files - meaning that all files will be copied as a single dir under path_out
+def flat_copy(path_in, path_out):
+    copied_count = 0
+
+    sub_folders = glob_folders(path_in)
+    for sub_id, sub_folder in enumerate(sub_folders):
+        files = glob_files(sub_folder)
+
+        print("Copied {} files in {}".format(len(files), sub_folder))
+        for file in files:
+            file_to = os.path.join(path_out, Path(os.path.basename(file)).stem)
+            shutil.copy(file, file_to)
+            copied_count += 1
+    print("Copied {} files".format(copied_count))

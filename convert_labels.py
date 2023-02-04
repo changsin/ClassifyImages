@@ -5,7 +5,7 @@ import shutil
 from src.constants import Mode, LabelFormat
 from src.converter import YoloV5Converter, EdgeImpulseConverter, CVATXmlConverter, CoCoConverter
 from src.parser import CoCoJsonParser, CVATXmlParser, KaggleXmlParser
-from src.utils import glob_files, glob_folders, split_train_val_test_files, copy_label_files
+from src.utils import glob_files, glob_folders, split_train_val_test_files, copy_label_files, flat_copy
 
 """
 convert label files into different formats
@@ -120,6 +120,9 @@ if __name__ == '__main__':
 
     elif args.mode == Mode.COPY_LABEL_FILES:
         copy_label_files(args.path_images, args.path_labels)
+
+    elif args.mode == Mode.FLAT_COPY:
+        flat_copy(args.path_in, args.path_out)
 
     else:
         print("Please specify the mode")

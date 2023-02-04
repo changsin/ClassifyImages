@@ -1,8 +1,9 @@
 # modify to correct paths of your option
 # The paths assume that you are running from
 # /contents/yolov5
-train: /home/aidev/data/AI-Hub/ChildZoneCCTV/split/train
-val: /home/aidev/data/AI-Hub/ChildZoneCCTV/split/val
+train: /home/aidev/data/AI-Hub/ChildZoneCCTV/run-tw-flat/train
+val: /home/aidev/data/AI-Hub/ChildZoneCCTV/run-tw-flat/val
+test: /home/aidev/data/AI-Hub/ChildZoneCCTV/run-tw-flat/test
 
 # number of classes
 nc: 10
