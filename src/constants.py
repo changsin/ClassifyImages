@@ -11,6 +11,7 @@ class Mode(Enum):
     CONVERT_XML = 'convert_xml'
     FILTER = 'filter'
     REMOVE_UNLABELED_FILES = 'remove_unlabeled_files'
+    CHECK_OVERLAPS = 'check_overlaps'
 
     def __str__(self):
         return self.value
@@ -128,7 +129,7 @@ SW_IGNORE = [
 
 class LabelFormat(Enum):
     CVAT_XML = 'cvat_xml'
-    KAGGLE_XML = 'kaggle_xml'
+    PASCAL_VOC = 'pascal_voc'
     EDGE_IMPULSE = 'edge_impulse'
     YOLOV5 = 'yolov5'
     COCO_JSON = 'coco_json'

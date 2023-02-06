@@ -19,7 +19,7 @@ class Parser(ABC):
         pass
 
 
-class KaggleXmlParser(Parser):
+class PascalVOCParser(Parser):
     def parse(self, folder, file_type='*'):
         def _parse_file(filename):
             width, height = 0, 0
