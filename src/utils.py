@@ -160,7 +160,7 @@ def flat_copy(path_in, path_out):
 
         print("Copied {} files in {}".format(len(files), sub_folder))
         for file in files:
-            file_to = os.path.join(path_out, Path(os.path.basename(file)).stem)
+            file_to = os.path.join(path_out, os.path.basename(file))
             shutil.copy(file, file_to)
             copied_count += 1
     print("Copied {} files".format(copied_count))
