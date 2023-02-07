@@ -150,6 +150,7 @@ def copy_label_files(folder_images, folder_labels):
             copied_count += 1
     print("Copied {} label files".format(copied_count))
 
+
 # Copy and flatten files - meaning that all files will be copied as a single dir under path_out
 def flat_copy(path_in, path_out):
     copied_count = 0
@@ -164,3 +165,19 @@ def flat_copy(path_in, path_out):
             shutil.copy(file, file_to)
             copied_count += 1
     print("Copied {} files".format(copied_count))
+
+
+def calculate_overlapped_area(a, b):
+    overlapped_area = 0.0
+    max_area = 0.0
+
+    dx = min(a.xmax, b.xmax) - max(a.xmin, b.xmin)
+    dy = min(a.ymax, b.ymax) - max(a.ymin, b.ymin)
+    if (dx >= 0) and (dy >= 0):
+        area1 = (a.xmax - a.xmin) * (a.ymax - a.ymin)
+        area2 = (b.xmax - b.xmin) * (b.ymax - b.ymin)
+
+        max_area = max(area1, area2)
+        overlapped_area = dx*dy
+
+    return overlapped_area, max_area
