@@ -6,8 +6,10 @@ from lxml import etree as ET
 
 import src.utils
 from src.constants import SW_IGNORE
-from src.utils import glob_files, get_parent_folder
+from src.utils import glob_files, get_parent_folder, calculate_overlapped_area
 from pathlib import Path
+from collections import namedtuple
+Rectangle = namedtuple('Rectangle', 'xmin ymin xmax ymax')
 
 
 class Parser(ABC):
@@ -19,7 +21,7 @@ class Parser(ABC):
         pass
 
 
-class KaggleXmlParser(Parser):
+class PascalVOCParser(Parser):
     def parse(self, folder, file_type='*'):
         def _parse_file(filename):
             width, height = 0, 0
@@ -52,66 +54,72 @@ class KaggleXmlParser(Parser):
         return np.array(image_labels)
 
 
+def check_dupes(boxes, threshold=0.9):
+    count_dupe_labels = 0
+    idx_to_remove = []
+
+    for id1 in range(len(boxes)):
+        for id2 in range(id1 + 1, len(boxes)):
+            tag1, xtl1, ytl1, xbr1, ybr1 = boxes[id1]
+            tag2, xtl2, ytl2, xbr2, ybr2 = boxes[id2]
+            rect1 = Rectangle(float(xtl1), float(ytl1), float(xbr1), float(ybr1))
+            rect2 = Rectangle(float(xtl2), float(ytl2), float(xbr2), float(ybr2))
+            overlapped_area, max_area = calculate_overlapped_area(rect1, rect2)
+            if overlapped_area > 0 and overlapped_area >= max_area * threshold:
+                print("\tDupe {} {}".format(rect1, rect2))
+                count_dupe_labels += 1
+                idx_to_remove.append(id2)
+
+    return idx_to_remove
+
+
 class CVATXmlParser(Parser):
     def convert_xml(self, path_in, path_out):
-        image_labels = []
-
         tree_out = ET.parse(path_in)
         # print("Labels are: ")
 
         el_root = tree_out.getroot()
 
+        is_dupe = False
+
+        # for each image, see if there are any overlapped labels
+        #           Do not add any overlapped labels
         for image in el_root.xpath('image'):
-            children = image.getchildren()
+            boxes = image.getchildren()
 
-            el_image = ET.SubElement(el_root, 'image')
-            el_image.set('name', image.attrib['name'])
-            el_image.set('id', image.attrib['id'])
-            el_image.set('width', image.attrib['width'])
-            el_image.set('height', image.attrib['height'])
+            tmp_boxes = []
 
-            for child in children:
-                el_new = ET.SubElement(el_image, 'polyline')
-                el_new.set('label', 'person')
-                el_new.set('occluded', child.attrib['occluded'])
-                # el_new.set('source', child.attrib['source'])
-                el_new.set('z_order', child.attrib['z_order'])
+            for box in boxes:
+                label = box.attrib['label']
+                xtl = float(box.attrib['xtl'])
+                ytl = float(box.attrib['ytl'])
+                xbr = float(box.attrib['xbr'])
+                ybr = float(box.attrib['ybr'])
 
-                # el_new.set('points', child.attrib['points'])
-                # points_new = ""
-                # points = child.attrib['points']
-                # tokens = points.split(';')
-                # for token in tokens:
-                #     x, y, visible = token.split(',')
-                #     points_new += "{},{};".format(x, y)
-                # points_new = points_new.removesuffix(';')
-                # el_new.set('points', str(points_new))
+                tmp_boxes.append((label, xtl, ytl, xbr, ybr))
 
-                tokens = child.attrib['points'].split(';')
+            idx_to_remove = list(set(check_dupes(tmp_boxes)))
 
-                idx_order = [0, 1, 2, 3, 4, 3, 5, 3, 2, 1, 0, 6, 7, 8, 9, 8, 10, 8, 7, 6, 0, 11, 12, 13, 14, 15, 16, 17, 16, 18, 16, 15, 14, 13, 19, 20, 21, 22, 21, 23, 21, 20, 19, 13, 24, 25, 24, 26]
+            for id in idx_to_remove:
+                box = boxes[id]
+                label = box.attrib['label']
+                xtl = box.attrib['xtl']
+                ytl = box.attrib['ytl']
+                xbr = box.attrib['xbr']
+                ybr = box.attrib['ybr']
 
-                points = []
-                for idx in idx_order:
-                    points.append(tokens[idx])
+                print("Removed dupe {} {}:{}".format(image.attrib['name'], id, (label, xtl, ytl, xbr, ybr)))
+                image.remove(boxes[id])
 
-                points_str = ""
-                for point in points:
-                    points_str += "{};".format(point)
+            if len(idx_to_remove) > 0:
+                is_dupe = True
 
-                # for token in tokens:
-                #     x, y, visible = token.split(',')
-                #     # points_new += "{},{},{};".format(x, y, visible)
-                points_str = points_str.removesuffix(';')
-                el_new.set('points', points_str)
+        if is_dupe:
+            file_name_out = os.path.join(path_out, Path(path_in).stem + ".xml")
+            print("***Writing to {}".format(file_name_out))
 
-            el_root.remove(image)
-
-        file_name_out = os.path.join(Path(path_in).parent, Path(path_in).stem + ".poly25.xml")
-        print("Writing to {}".format(file_name_out))
-
-        with open(file_name_out, "wb") as xml:
-            xml.write(ET.tostring(tree_out, encoding="utf-8", pretty_print=True))
+            with open(file_name_out, "wb") as xml:
+                xml.write(ET.tostring(tree_out, encoding="utf-8", pretty_print=True))
 
     def parse(self, filename, file_type='*'):
         image_labels = []
