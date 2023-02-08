@@ -124,31 +124,54 @@ def split_train_val_test_files(parent_folder, folder_from, folder_to, ratio=0.1)
 
 
 def copy_label_files(folder_images, folder_labels):
-    copied_count = 0
+    count_copied = 0
+    count_skipped = 0
+    count_images = 0
+    count_labels = 0
+    count_dupe_img = 0
 
     labels_dict = dict()
     label_sub_folders = glob_folders(folder_labels)
     for label_sub_id, label_sub_folder in enumerate(label_sub_folders):
         label_files = glob_files(label_sub_folder)
 
+        count_labels += len(label_files)
+
         for label_file in label_files:
             file_name = Path(os.path.basename(label_file)).stem
             if labels_dict.get(file_name.lower()):
-                print("ERROR: Duplicate file names found!")
+                print("***ERROR: Duplicate label file names found! {} {}"
+                .format(label_file, labels_dict[file_name.lower()]))
             else:
                 labels_dict[file_name.lower()] = label_file
 
     image_sub_folders = glob_folders(folder_images)
+    images_dict = dict()
     for img_sub_id, img_sub_folder in enumerate(image_sub_folders):
-        img_files = glob_files(img_sub_folder)
+        img_files = glob_files(img_sub_folder, file_type='*.jpg')
+
+        count_images += len(img_files)
 
         for img_file in img_files:
             file_name = Path(os.path.basename(img_file)).stem
-            label_file_path = labels_dict[file_name.lower()]
-            print(label_file_path, img_sub_folder)
-            shutil.copy(label_file_path, os.path.dirname(img_file))
-            copied_count += 1
-    print("Copied {} label files".format(copied_count))
+            if images_dict.get(file_name.lower()):
+                print("***ERROR: Duplicate image file names found! {} {}"
+                .format(img_file, images_dict[file_name.lower()]))
+                count_dupe_img += 1
+            else:
+                images_dict[file_name.lower()] = img_file
+
+            if not labels_dict.get(file_name.lower()):
+                print("*Error: can't find the matching label file for {}".format(file_name))
+                count_skipped += 1
+            else:
+                label_file_path = labels_dict[file_name.lower()]
+                print(label_file_path, img_sub_folder)
+                shutil.copy(label_file_path, os.path.dirname(img_file))
+                count_copied += 1
+
+    print("Found {} duplicate image files".format(count_dupe_img))
+    print("Copied {} label files: {}/{} skipped: {}".format(count_copied, count_labels, count_images, count_skipped))
 
 
 # Copy and flatten files - meaning that all files will be copied as a single dir under path_out

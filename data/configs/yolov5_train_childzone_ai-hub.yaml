@@ -1,0 +1,13 @@
+# modify to correct paths of your option
+# The paths assume that you are running from
+# /contents/yolov5
+train: /home/aidev/data/AI-Hub/ChildZoneCCTV/run-ai-hub/train
+val: /home/aidev/data/AI-Hub/ChildZoneCCTV/run-ai-hub/val
+test: /home/aidev/data/AI-Hub/ChildZoneCCTV/run-ai-hub/test
+
+# number of classes
+nc: 10
+
+# class names
+names: [ "person", "vehicle", "cycle", "kick", "face", "license_plate", "umbrella", "traffic_light", "dog",
+              "motorbike"]
